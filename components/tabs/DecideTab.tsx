@@ -226,9 +226,14 @@ export default function DecideTab() {
     kWhNeeded,
   ]);
 
-  // Winner: LLM pick if it matches a feasible option, else cheapest feasible.
+  // Nighttime public charging is always dominated, so it can never be the
+  // recommended winner (only NIO is acceptable at night). It stays visible in
+  // the comparison, flagged, for transparency.
+  const recommendable = feasible.filter((o) => o.isNightOption !== true);
   const winner: CalculatedOption | undefined =
-    (reco && feasible.find((o) => o.id === reco.winner)) || feasible[0];
+    (reco && recommendable.find((o) => o.id === reco.winner)) ||
+    recommendable[0] ||
+    feasible[0];
 
   async function startCharging(option: CalculatedOption) {
     try {
@@ -480,15 +485,19 @@ export default function DecideTab() {
                 </button>
               </div>
               <div className="space-y-2">
-                {feasible.map((o) => (
-                  <OptionRow
-                    key={o.id}
-                    option={o}
-                    isWinner={o.id === winner.id}
-                    showBreakdown={showBreakdown}
-                    onStart={startCharging}
-                  />
-                ))}
+                {feasible.map((o) => {
+                  const nightPublic = o.isNightOption === true;
+                  return (
+                    <OptionRow
+                      key={o.id}
+                      option={o}
+                      isWinner={o.id === winner.id}
+                      showBreakdown={showBreakdown}
+                      note={nightPublic ? tr("decide.nightNote") : undefined}
+                      onStart={nightPublic ? undefined : startCharging}
+                    />
+                  );
+                })}
                 {filtered.map((o) => (
                   <OptionRow
                     key={o.id}

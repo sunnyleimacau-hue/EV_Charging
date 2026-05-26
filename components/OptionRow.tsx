@@ -8,12 +8,14 @@ export default function OptionRow({
   isWinner,
   showBreakdown,
   disabled,
+  note,
   onStart,
 }: {
   option: CalculatedOption;
   isWinner?: boolean;
   showBreakdown?: boolean;
   disabled?: boolean;
+  note?: string;
   onStart?: (o: CalculatedOption) => void;
 }) {
   const { tr } = useApp();
@@ -33,6 +35,11 @@ export default function OptionRow({
             {formatTime(option.time)} · {option.mopPerKwh.toFixed(2)} MOP/kWh
             {disabled && ` · ${tr("decide.tooLong")}`}
           </p>
+          {note && (
+            <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+              {note}
+            </p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold tabular-nums">

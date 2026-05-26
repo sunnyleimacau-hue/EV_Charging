@@ -104,6 +104,10 @@ const dict = {
   },
   "decide.energy": { en: "energy", "zh-Hant": "電費" },
   "decide.tooLong": { en: "too long for dwell time", "zh-Hant": "超過停留時間" },
+  "decide.nightNote": {
+    en: "not advised at night — use NIO or charge by day",
+    "zh-Hant": "夜間不建議，請用 NIO 或日間充電",
+  },
 
   "warn.target90": {
     en: "charging above 90% adds wear; fine occasionally",

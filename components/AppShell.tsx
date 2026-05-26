@@ -15,19 +15,26 @@ import ServiceWorkerRegister from "./ServiceWorkerRegister";
 export default function AppShell({
   initialSettings,
   initialActiveSession,
+  dbError,
 }: {
   initialSettings: Settings | null;
   initialActiveSession: Session | null;
+  dbError?: string | null;
 }) {
   if (!initialSettings) {
     return (
       <main className="mx-auto flex min-h-screen max-w-app items-center justify-center px-6 text-center">
-        <div className="space-y-2">
-          <p className="font-medium">database not configured</p>
+        <div className="space-y-3">
+          <p className="font-medium">database not ready</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            set DATABASE_URL, then run the schema in db/schema.sql against your
-            Neon database.
+            set DATABASE_URL and run db/schema.sql against your Neon database. On
+            Vercel, redeploy after adding env vars.
           </p>
+          {dbError && (
+            <p className="rounded-md bg-red-50 px-3 py-2 font-mono text-xs text-red-600 dark:bg-red-950/30 dark:text-red-400">
+              {dbError}
+            </p>
+          )}
         </div>
       </main>
     );

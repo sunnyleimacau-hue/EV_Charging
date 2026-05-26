@@ -89,6 +89,58 @@ export function calculateChargingTime(
   return timeHours;
 }
 
+export interface ReachResult {
+  endSOC: number;
+  kWhAdded: number;
+  timeUsed: number;
+}
+
+// Forward-integrates the taper to find how much SOC can be added within a fixed
+// time budget. The inverse of calculateChargingTime: same 0.5 kWh stepping and
+// per-family taper, so the two stay consistent.
+export function reachableSOC(
+  power: number,
+  availableHours: number,
+  startSOC: number,
+  batteryCapacity: number,
+  optionId: string,
+): ReachResult {
+  const start = Math.max(0, Math.min(100, startSOC));
+  if (power <= 0 || availableHours <= 0 || batteryCapacity <= 0) {
+    return { endSOC: start, kWhAdded: 0, timeUsed: 0 };
+  }
+
+  const profile = taperProfile(optionId);
+  const step = 0.5;
+  let energyInBattery = (start / 100) * batteryCapacity;
+  let added = 0;
+  let timeLeft = availableHours;
+
+  while (timeLeft > 1e-9 && energyInBattery < batteryCapacity - 1e-9) {
+    const soc = (energyInBattery / batteryCapacity) * 100;
+    const eff = effectivePower(profile, power, soc);
+    if (eff <= 0) break;
+    const chunk = Math.min(step, batteryCapacity - energyInBattery);
+    const timeForChunk = chunk / eff;
+    if (timeForChunk <= timeLeft) {
+      energyInBattery += chunk;
+      added += chunk;
+      timeLeft -= timeForChunk;
+    } else {
+      const partial = eff * timeLeft;
+      energyInBattery += partial;
+      added += partial;
+      timeLeft = 0;
+    }
+  }
+
+  return {
+    endSOC: (energyInBattery / batteryCapacity) * 100,
+    kWhAdded: added,
+    timeUsed: availableHours - timeLeft,
+  };
+}
+
 export function calculateOption(
   option: ChargerOption,
   kWhNeeded: number,

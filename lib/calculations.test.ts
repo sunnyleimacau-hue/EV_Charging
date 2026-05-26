@@ -3,6 +3,7 @@ import {
   calculateOption,
   getAllOptions,
   rankOptions,
+  reachableSOC,
   formatTime,
   formatMOP,
   kWhToAdd,
@@ -68,6 +69,46 @@ describe("calculateChargingTime — taper", () => {
 
   test("zero kWh needed takes no time", () => {
     expect(calculateChargingTime(30, 0, 50, 75, "nio")).toBe(0);
+  });
+});
+
+describe("reachableSOC — forward taper", () => {
+  test("slow charger is linear: adds power x hours", () => {
+    const r = reachableSOC(7.4, 2, 50, 75, "slow-day");
+    expect(r.kWhAdded).toBeCloseTo(14.8, 5);
+    expect(r.endSOC).toBeCloseTo(50 + (14.8 / 75) * 100, 4);
+    expect(r.timeUsed).toBeCloseTo(2, 5);
+  });
+
+  test("is the inverse of calculateChargingTime (linear)", () => {
+    const r = reachableSOC(7.4, 2, 50, 75, "slow-day");
+    const t = calculateChargingTime(7.4, r.kWhAdded, 50, 75, "slow-day");
+    expect(t).toBeCloseTo(2, 4);
+  });
+
+  test("NIO taper above 95% adds less than rated x hours", () => {
+    const r = reachableSOC(30, 0.1, 93, 75, "nio");
+    // No-taper would be 30 * 0.1 = 3 kWh; taper above 95% slows it.
+    expect(r.kWhAdded).toBeLessThan(3);
+    expect(r.kWhAdded).toBeGreaterThan(0);
+  });
+
+  test("quick below 80% uses 95% of rated power", () => {
+    const r = reachableSOC(60, 0.1, 50, 75, "quick-day");
+    expect(r.kWhAdded).toBeCloseTo(60 * 0.95 * 0.1, 2);
+  });
+
+  test("caps at 100% when the time budget is generous", () => {
+    const r = reachableSOC(60, 100, 10, 75, "quick-day");
+    expect(r.endSOC).toBeCloseTo(100, 5);
+    expect(r.kWhAdded).toBeCloseTo((90 / 100) * 75, 4);
+    expect(r.timeUsed).toBeLessThan(100);
+  });
+
+  test("zero hours adds nothing", () => {
+    const r = reachableSOC(30, 0, 50, 75, "nio");
+    expect(r.kWhAdded).toBe(0);
+    expect(r.endSOC).toBe(50);
   });
 });
 

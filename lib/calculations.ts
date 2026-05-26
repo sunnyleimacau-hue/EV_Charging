@@ -194,6 +194,51 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
   ];
 }
 
+export interface ExtraOptions {
+  custom?: { name?: string; tariff: number; power: number } | null;
+  zhuhai?: boolean;
+}
+
+// Builds the full option list (7 base + optional custom + optional Zhuhai) and
+// computes each one with the correct per-option context. Night variants force a
+// night context; everything else follows the supplied baseCtx.
+export function computeOptions(
+  settings: Settings,
+  kWhNeeded: number,
+  startSOC: number,
+  baseCtx: ChargingContext,
+  extras?: ExtraOptions,
+): CalculatedOption[] {
+  const opts = getAllOptions(settings);
+
+  if (extras?.custom && extras.custom.power > 0) {
+    opts.push({
+      id: "custom",
+      name: extras.custom.name ?? "custom station",
+      power: extras.custom.power,
+      tariff: extras.custom.tariff,
+      usesPublicParking: false,
+    });
+  }
+
+  if (extras?.zhuhai) {
+    opts.push({
+      id: "zhuhai",
+      name: "Zhuhai DC",
+      power: 60,
+      tariff: settings.rmb_to_mop,
+      usesPublicParking: false,
+    });
+  }
+
+  return opts.map((o) =>
+    calculateOption(o, kWhNeeded, startSOC, settings, {
+      ...baseCtx,
+      isNight: o.isNightOption ?? baseCtx.isNight,
+    }),
+  );
+}
+
 export function rankOptions(
   options: CalculatedOption[],
   dwellHours?: number,

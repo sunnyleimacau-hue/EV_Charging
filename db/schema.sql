@@ -15,7 +15,7 @@ create table settings (
   public_parking_night numeric not null default 3,
   home_rent_monthly numeric not null default 2700,
   battery_capacity numeric not null default 75,
-  rmb_to_mop numeric not null default 1.10,
+  rmb_to_mop numeric not null default 1.18,
   battery_chemistry text default 'unknown' check (battery_chemistry in ('NMC','LFP','unknown')),
   daily_kwh_estimate numeric default 2.5,
   wife_mode_default boolean default false,

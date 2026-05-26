@@ -1,27 +1,25 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
+import type { Session } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Returns the active session row (or null), with the full session expanded.
 export async function GET() {
-  const supabase = getSupabase();
-  const { data: active, error } = await supabase
-    .from("active_session")
-    .select("session_id")
-    .eq("id", 1)
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!active?.session_id) return NextResponse.json({ session: null });
+  try {
+    const active = await one<{ session_id: string | null }>(
+      "select session_id from active_session where id = 1",
+    );
+    if (!active?.session_id) return NextResponse.json({ session: null });
 
-  const { data: session, error: sErr } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("id", active.session_id)
-    .single();
-  if (sErr) return NextResponse.json({ session: null });
-  return NextResponse.json({ session });
+    const session = await one<Session>("select * from sessions where id = $1", [
+      active.session_id,
+    ]);
+    return NextResponse.json({ session: session ?? null });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function PUT(req: Request) {
@@ -33,21 +31,28 @@ export async function PUT(req: Request) {
   }
   const sessionId = body.session_id ? String(body.session_id) : null;
 
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from("active_session")
-    .update({ session_id: sessionId, updated_at: new Date().toISOString() })
-    .eq("id", 1);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await query(
+      "update active_session set session_id = $1, updated_at = now() where id = 1",
+      [sessionId],
+    );
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function DELETE() {
-  const supabase = getSupabase();
-  const { error } = await supabase
-    .from("active_session")
-    .update({ session_id: null, updated_at: new Date().toISOString() })
-    .eq("id", 1);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await query(
+      "update active_session set session_id = null, updated_at = now() where id = 1",
+    );
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

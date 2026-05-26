@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
 import { getOpenAI, OPENAI_MODEL } from "@/lib/openai";
 import { buildChatSystemPrompt, type CurrentState } from "@/lib/prompts";
 import type { Session, Settings } from "@/lib/types";
@@ -29,21 +29,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
 
-  const supabase = getSupabase();
-  const [{ data: settings }, { data: sessions }] = await Promise.all([
-    supabase.from("settings").select("*").eq("id", 1).single(),
-    supabase
-      .from("sessions")
-      .select("*")
-      .order("started_at", { ascending: false })
-      .limit(10),
+  const [settings, sessions] = await Promise.all([
+    one<Settings>("select * from settings where id = 1"),
+    query<Session>(
+      "select * from sessions order by started_at desc limit 10",
+    ),
   ]);
 
-  const system = buildChatSystemPrompt(
-    settings as Settings,
-    (sessions ?? []) as Session[],
-    body.context ?? {},
-  );
+  if (!settings) {
+    return NextResponse.json({ error: "settings not found" }, { status: 500 });
+  }
+
+  const system = buildChatSystemPrompt(settings, sessions, body.context ?? {});
 
   const history = (body.history ?? [])
     .slice(-6)

@@ -1,6 +1,7 @@
--- Macau EV charging app — Supabase Postgres schema
--- No row-level security: access is gated by middleware; the service role key
--- (used only in /app/api/* routes) bypasses RLS, which is what we want.
+-- Macau EV charging app — Postgres schema (Neon).
+-- Access is gated by middleware; all writes go through /app/api/* routes using
+-- DATABASE_URL. gen_random_uuid() is built into Postgres 13+ (no extension).
+-- Run this against your Neon database via the SQL editor or psql.
 
 -- Settings: single row, app-wide
 create table settings (

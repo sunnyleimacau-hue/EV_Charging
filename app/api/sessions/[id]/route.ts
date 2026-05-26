@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { buildSet, one, query } from "@/lib/db";
+import type { Session } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,44 +24,49 @@ export async function PATCH(
     update.duration_hours = Number(body.duration_hours);
   if (body.notes !== undefined)
     update.notes = body.notes == null ? null : String(body.notes);
-  if (body.completed != null && body.completed) {
-    update.completed_at = new Date().toISOString();
-  }
+  if (body.completed) update.completed_at = new Date().toISOString();
   if (body.completed_at != null) update.completed_at = String(body.completed_at);
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("sessions")
-    .update(update)
-    .eq("id", params.id)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // If this session was the active one and is now complete, clear the tracker.
-  if (update.completed_at) {
-    const { data: active } = await supabase
-      .from("active_session")
-      .select("session_id")
-      .eq("id", 1)
-      .single();
-    if (active?.session_id === params.id) {
-      await supabase
-        .from("active_session")
-        .update({ session_id: null, updated_at: new Date().toISOString() })
-        .eq("id", 1);
-    }
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
   }
 
-  return NextResponse.json(data);
+  try {
+    const { clause, values } = buildSet(update);
+    const row = await one<Session>(
+      `update sessions set ${clause} where id = $${values.length + 1} returning *`,
+      [...values, params.id],
+    );
+    if (!row) {
+      return NextResponse.json({ error: "not found" }, { status: 404 });
+    }
+
+    // If this completed session was the active one, clear the tracker.
+    if (update.completed_at) {
+      await query(
+        "update active_session set session_id = null, updated_at = now() where id = 1 and session_id = $1",
+        [params.id],
+      );
+    }
+
+    return NextResponse.json(row);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
-  const supabase = getSupabase();
-  const { error } = await supabase.from("sessions").delete().eq("id", params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await query("delete from sessions where id = $1", [params.id]);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

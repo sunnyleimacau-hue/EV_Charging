@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { buildSet, one, query } from "@/lib/db";
+import type { Charger } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,23 +39,35 @@ export async function PATCH(
   if (body.use_count != null) update.use_count = Number(body.use_count);
   if (body.last_used_at != null) update.last_used_at = String(body.last_used_at);
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("chargers")
-    .update(update)
-    .eq("id", params.id)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  if (Object.keys(update).length === 0) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+  }
+
+  try {
+    const { clause, values } = buildSet(update);
+    const row = await one<Charger>(
+      `update chargers set ${clause} where id = $${values.length + 1} returning *`,
+      [...values, params.id],
+    );
+    if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
+    return NextResponse.json(row);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
-  const supabase = getSupabase();
-  const { error } = await supabase.from("chargers").delete().eq("id", params.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  try {
+    await query("delete from chargers where id = $1", [params.id]);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

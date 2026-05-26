@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
 import { getOpenAI, OPENAI_MODEL } from "@/lib/openai";
 import { buildRecommendSystemPrompt } from "@/lib/prompts";
 import {
@@ -37,17 +37,15 @@ export async function POST(req: Request) {
     dwellHours: body.context?.dwellHours,
   };
 
-  const supabase = getSupabase();
-  const [{ data: settings }, { data: sessions }] = await Promise.all([
-    supabase.from("settings").select("*").eq("id", 1).single(),
-    supabase
-      .from("sessions")
-      .select("*")
-      .order("started_at", { ascending: false })
-      .limit(10),
+  const [settings, sessions] = await Promise.all([
+    one<Settings>("select * from settings where id = 1"),
+    query<Session>("select * from sessions order by started_at desc limit 10"),
   ]);
 
-  const s = settings as Settings;
+  if (!settings) {
+    return NextResponse.json({ error: "settings not found" }, { status: 500 });
+  }
+  const s = settings;
   const kWhNeeded = kWhToAdd(currentSOC, targetSOC, s.battery_capacity);
   const all = computeOptions(s, kWhNeeded, currentSOC, ctx, body.extras);
   const { feasible } = rankOptions(all, ctx.dwellHours);
@@ -66,7 +64,7 @@ export async function POST(req: Request) {
 
   try {
     const openai = getOpenAI();
-    const system = buildRecommendSystemPrompt(s, pool, (sessions ?? []) as Session[]);
+    const system = buildRecommendSystemPrompt(s, pool, sessions);
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       max_tokens: 400,

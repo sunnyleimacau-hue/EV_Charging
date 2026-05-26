@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
+import type { Charger } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,14 +8,14 @@ export const dynamic = "force-dynamic";
 const TYPES = ["slow", "medium", "quick", "custom", "nio"];
 
 export async function GET() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("chargers")
-    .select("*")
-    .order("use_count", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  try {
+    const rows = await query<Charger>(
+      "select * from chargers order by use_count desc, created_at desc",
+    );
+    return NextResponse.json(rows);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -33,28 +34,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
-  const row = {
-    name: String(body.name),
-    charger_type: type,
-    power_kw: Number(body.power_kw ?? 0),
-    custom_tariff_mop_per_kwh:
-      body.custom_tariff_mop_per_kwh != null
-        ? Number(body.custom_tariff_mop_per_kwh)
-        : null,
-    location_name: body.location_name != null ? String(body.location_name) : null,
-    walking_minutes:
-      body.walking_minutes != null ? Number(body.walking_minutes) : null,
-    notes: body.notes != null ? String(body.notes) : null,
-    reliability_rating:
-      body.reliability_rating != null ? Number(body.reliability_rating) : null,
-  };
+  try {
+    const row = await one<Charger>(
+      `insert into chargers (
+         name, charger_type, power_kw, custom_tariff_mop_per_kwh,
+         location_name, walking_minutes, notes, reliability_rating
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+      [
+        String(body.name),
+        type,
+        Number(body.power_kw ?? 0),
+        body.custom_tariff_mop_per_kwh != null
+          ? Number(body.custom_tariff_mop_per_kwh)
+          : null,
+        body.location_name != null ? String(body.location_name) : null,
+        body.walking_minutes != null ? Number(body.walking_minutes) : null,
+        body.notes != null ? String(body.notes) : null,
+        body.reliability_rating != null ? Number(body.reliability_rating) : null,
+      ],
+    );
+    return NextResponse.json(row, { status: 201 });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
+}
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("chargers")
-    .insert(row)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data, { status: 201 });
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

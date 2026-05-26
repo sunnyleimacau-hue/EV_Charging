@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/supabase";
+import { one } from "@/lib/db";
 import AppShell from "@/components/AppShell";
 import type { Session, Settings } from "@/lib/types";
 
@@ -9,26 +9,16 @@ export default async function Page() {
   let activeSession: Session | null = null;
 
   try {
-    const supabase = getSupabase();
-    const { data: s } = await supabase
-      .from("settings")
-      .select("*")
-      .eq("id", 1)
-      .single();
-    settings = (s as Settings) ?? null;
+    settings = await one<Settings>("select * from settings where id = 1");
 
-    const { data: active } = await supabase
-      .from("active_session")
-      .select("session_id")
-      .eq("id", 1)
-      .single();
+    const active = await one<{ session_id: string | null }>(
+      "select session_id from active_session where id = 1",
+    );
     if (active?.session_id) {
-      const { data: sess } = await supabase
-        .from("sessions")
-        .select("*")
-        .eq("id", active.session_id)
-        .single();
-      activeSession = (sess as Session) ?? null;
+      activeSession = await one<Session>(
+        "select * from sessions where id = $1",
+        [active.session_id],
+      );
     }
   } catch {
     // DB not configured yet — AppShell shows a setup hint.

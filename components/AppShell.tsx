@@ -25,8 +25,8 @@ export default function AppShell({
         <div className="space-y-2">
           <p className="font-medium">database not configured</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, then run
-            the schema in supabase/schema.sql.
+            set DATABASE_URL, then run the schema in db/schema.sql against your
+            Neon database.
           </p>
         </div>
       </main>

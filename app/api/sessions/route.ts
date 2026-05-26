@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
+import type { Session } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,24 +8,34 @@ export const dynamic = "force-dynamic";
 const CHARGER_TYPES = ["nio", "slow", "medium", "quick", "custom", "zhuhai"];
 
 export async function GET(req: Request) {
-  const supabase = getSupabase();
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");
   const to = searchParams.get("to");
-  const limit = Number(searchParams.get("limit") ?? 200);
+  const limitRaw = Number(searchParams.get("limit") ?? 200);
+  const limit = Number.isFinite(limitRaw) ? Math.min(limitRaw, 500) : 200;
 
-  let query = supabase
-    .from("sessions")
-    .select("*")
-    .order("started_at", { ascending: false })
-    .limit(Number.isFinite(limit) ? limit : 200);
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (from) {
+    params.push(from);
+    conditions.push(`started_at >= $${params.length}`);
+  }
+  if (to) {
+    params.push(to);
+    conditions.push(`started_at <= $${params.length}`);
+  }
+  const where = conditions.length ? `where ${conditions.join(" and ")}` : "";
+  params.push(limit);
 
-  if (from) query = query.gte("started_at", from);
-  if (to) query = query.lte("started_at", to);
-
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  try {
+    const rows = await query<Session>(
+      `select * from sessions ${where} order by started_at desc limit $${params.length}`,
+      params,
+    );
+    return NextResponse.json(rows);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -40,47 +51,53 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid charger_type" }, { status: 400 });
   }
 
-  const row = {
-    charger_type: chargerType,
-    charger_name: String(body.charger_name ?? "charger"),
-    power_kw: Number(body.power_kw ?? 0),
-    tariff_mop_per_kwh: Number(body.tariff_mop_per_kwh ?? 0),
-    start_soc: Number(body.start_soc ?? 0),
-    target_soc: Number(body.target_soc ?? 0),
-    estimated_kwh: Number(body.estimated_kwh ?? 0),
-    estimated_cost: Number(body.estimated_cost ?? 0),
-    duration_hours: body.duration_hours != null ? Number(body.duration_hours) : null,
-    was_night: Boolean(body.was_night),
-    had_family_parking: Boolean(body.had_family_parking),
-    parking_was_sunk: Boolean(body.parking_was_sunk),
-    logged_by: body.logged_by != null ? String(body.logged_by) : null,
-    notes: body.notes != null ? String(body.notes) : null,
-  };
+  try {
+    const row = await one<Session>(
+      `insert into sessions (
+         charger_type, charger_name, power_kw, tariff_mop_per_kwh,
+         start_soc, target_soc, estimated_kwh, estimated_cost,
+         duration_hours, was_night, had_family_parking, parking_was_sunk,
+         logged_by, notes
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       returning *`,
+      [
+        chargerType,
+        String(body.charger_name ?? "charger"),
+        Number(body.power_kw ?? 0),
+        Number(body.tariff_mop_per_kwh ?? 0),
+        Number(body.start_soc ?? 0),
+        Number(body.target_soc ?? 0),
+        Number(body.estimated_kwh ?? 0),
+        Number(body.estimated_cost ?? 0),
+        body.duration_hours != null ? Number(body.duration_hours) : null,
+        Boolean(body.was_night),
+        Boolean(body.had_family_parking),
+        Boolean(body.parking_was_sunk),
+        body.logged_by != null ? String(body.logged_by) : null,
+        body.notes != null ? String(body.notes) : null,
+      ],
+    );
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("sessions")
-    .insert(row)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Mark as the single active session.
+    await query(
+      "update active_session set session_id = $1, updated_at = now() where id = 1",
+      [row!.id],
+    );
 
-  // Mark as the single active session.
-  await supabase
-    .from("active_session")
-    .update({ session_id: data.id, updated_at: new Date().toISOString() })
-    .eq("id", 1);
+    // Bump charger use-count if this session used a saved charger.
+    if (body.charger_id) {
+      await query(
+        "update chargers set use_count = use_count + 1, last_used_at = now() where id = $1",
+        [String(body.charger_id)],
+      );
+    }
 
-  // Bump charger use-count if this session used a saved charger by name.
-  if (body.charger_id) {
-    await supabase
-      .from("chargers")
-      .update({
-        use_count: Number(body.charger_use_count ?? 0) + 1,
-        last_used_at: new Date().toISOString(),
-      })
-      .eq("id", String(body.charger_id));
+    return NextResponse.json(row, { status: 201 });
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
   }
+}
 
-  return NextResponse.json(data, { status: 201 });
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

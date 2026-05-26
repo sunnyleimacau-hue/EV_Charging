@@ -6,7 +6,7 @@ A mobile-first web app for deciding **where and when to charge a NIO ET5T (75 kW
 
 - Next.js 14 (App Router) + TypeScript (strict)
 - Tailwind CSS
-- Supabase Postgres (database only — **not** Supabase Auth)
+- Neon serverless Postgres (database only)
 - OpenAI Node SDK (`gpt-4o-mini`) for the smart layer
 - lucide-react icons, date-fns
 - Deploys to the Vercel free tier
@@ -22,7 +22,7 @@ A mobile-first web app for deciding **where and when to charge a NIO ET5T (75 kW
 
 ## Auth model
 
-Single shared password in `APP_PASSWORD`. `/api/login` does a constant-time compare and sets an HMAC-SHA256 signed, httpOnly cookie (signed with `COOKIE_SECRET`). `middleware.ts` protects every route except `/login`, `/api/login`, and static assets. All database writes happen in `/app/api/*` routes using the Supabase **service role key**, which is never imported into client code.
+Single shared password in `APP_PASSWORD`. `/api/login` does a constant-time compare and sets an HMAC-SHA256 signed, httpOnly cookie (signed with `COOKIE_SECRET`). `middleware.ts` protects every route except `/login`, `/api/login`, and static assets. All database access happens in `/app/api/*` routes (and the server-rendered page) using `DATABASE_URL`, which is never exposed to the client.
 
 ## Setup
 
@@ -30,14 +30,14 @@ Single shared password in `APP_PASSWORD`. `/api/login` does a constant-time comp
    ```bash
    npm install
    ```
-2. Create a Supabase project and run the schema in `supabase/schema.sql` (SQL editor). It seeds the single settings row and the active-session tracker.
+2. Create a Neon project and run the schema in `db/schema.sql` (Neon SQL editor or `psql`). It seeds the single settings row and the active-session tracker.
 3. Copy the env template and fill it in:
    ```bash
    cp .env.local.example .env.local
    ```
    - `APP_PASSWORD` — the shared password
    - `COOKIE_SECRET` — `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
-   - `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — from Supabase project settings
+   - `DATABASE_URL` — the Neon **pooled** connection string (from the Neon dashboard)
    - `OPENAI_API_KEY` — for the chat / recommend / refine endpoints
 4. Run it:
    ```bash
@@ -53,7 +53,7 @@ Single shared password in `APP_PASSWORD`. `/api/login` does a constant-time comp
 
 ## Deploying to Vercel
 
-Import the repo, set the five environment variables above in the Vercel project, and deploy. The app is fully serverless and fits the free tier.
+Import the repo, set the four environment variables above in the Vercel project (or use the Neon–Vercel integration, which injects `DATABASE_URL` automatically), and deploy. The app is fully serverless and fits the free tier.
 
 ## Cost model (summary)
 

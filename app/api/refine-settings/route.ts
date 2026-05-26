@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { one, query } from "@/lib/db";
 import { getOpenAI, OPENAI_MODEL } from "@/lib/openai";
 import { buildRefineSettingsPrompt } from "@/lib/prompts";
 import type { Session, Settings } from "@/lib/types";
@@ -30,19 +30,17 @@ const VALID_FIELDS = new Set([
 ]);
 
 export async function POST() {
-  const supabase = getSupabase();
-  const [{ data: settings }, { data: sessions }] = await Promise.all([
-    supabase.from("settings").select("*").eq("id", 1).single(),
-    supabase
-      .from("sessions")
-      .select("*")
-      .not("actual_cost", "is", null)
-      .order("started_at", { ascending: false })
-      .limit(20),
+  const [settings, history] = await Promise.all([
+    one<Settings>("select * from settings where id = 1"),
+    query<Session>(
+      "select * from sessions where actual_cost is not null order by started_at desc limit 20",
+    ),
   ]);
 
-  const s = settings as Settings;
-  const history = (sessions ?? []) as Session[];
+  if (!settings) {
+    return NextResponse.json({ proposals: [] });
+  }
+  const s = settings;
 
   try {
     const openai = getOpenAI();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { buildSet, one } from "@/lib/db";
+import type { Settings } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,14 +20,12 @@ const NUMERIC_FIELDS = [
 ] as const;
 
 export async function GET() {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("settings")
-    .select("*")
-    .eq("id", 1)
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  try {
+    const row = await one<Settings>("select * from settings where id = 1");
+    return NextResponse.json(row);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
 }
 
 export async function PUT(req: Request) {
@@ -37,18 +36,18 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 });
   }
 
-  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const update: Record<string, unknown> = {};
 
-  for (const field of NUMERIC_FIELDS) {
-    if (body[field] != null) {
-      const n = Number(body[field]);
+  for (const f of NUMERIC_FIELDS) {
+    if (body[f] != null) {
+      const n = Number(body[f]);
       if (!Number.isFinite(n) || n < 0) {
         return NextResponse.json(
-          { error: `invalid value for ${field}` },
+          { error: `invalid value for ${f}` },
           { status: 400 },
         );
       }
-      update[field] = n;
+      update[f] = n;
     }
   }
 
@@ -67,13 +66,20 @@ export async function PUT(req: Request) {
     update.wife_mode_default = Boolean(body.wife_mode_default);
   }
 
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("settings")
-    .update(update)
-    .eq("id", 1)
-    .select("*")
-    .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  update.updated_at = new Date().toISOString();
+
+  try {
+    const { clause, values } = buildSet(update);
+    const row = await one<Settings>(
+      `update settings set ${clause} where id = 1 returning *`,
+      values,
+    );
+    return NextResponse.json(row);
+  } catch (err) {
+    return NextResponse.json({ error: message(err) }, { status: 500 });
+  }
+}
+
+function message(err: unknown): string {
+  return err instanceof Error ? err.message : "database error";
 }

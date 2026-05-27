@@ -251,16 +251,8 @@ export interface ExtraOptions {
   zhuhai?: boolean;
 }
 
-// Builds the full option list (7 base + optional custom + optional Zhuhai) and
-// computes each one with the correct per-option context. Night variants force a
-// night context; everything else follows the supplied baseCtx.
-export function computeOptions(
-  settings: Settings,
-  kWhNeeded: number,
-  startSOC: number,
-  baseCtx: ChargingContext,
-  extras?: ExtraOptions,
-): CalculatedOption[] {
+// Builds the full option list: 7 base + optional custom + optional Zhuhai.
+function buildOptionList(settings: Settings, extras?: ExtraOptions): ChargerOption[] {
   const opts = getAllOptions(settings);
 
   if (extras?.custom && extras.custom.power > 0) {
@@ -283,12 +275,73 @@ export function computeOptions(
     });
   }
 
-  return opts.map((o) =>
+  return opts;
+}
+
+// Computes each option with the correct per-option context. Night variants force
+// a night context; everything else follows the supplied baseCtx.
+export function computeOptions(
+  settings: Settings,
+  kWhNeeded: number,
+  startSOC: number,
+  baseCtx: ChargingContext,
+  extras?: ExtraOptions,
+): CalculatedOption[] {
+  return buildOptionList(settings, extras).map((o) =>
     calculateOption(o, kWhNeeded, startSOC, settings, {
       ...baseCtx,
       isNight: o.isNightOption ?? baseCtx.isNight,
     }),
   );
+}
+
+export interface DwellOption extends CalculatedOption {
+  // SOC actually reached within the dwell window (capped at target).
+  endSOC: number;
+  // Whether this charger reaches the target within the dwell window.
+  meetsTarget: boolean;
+}
+
+// Dwell-first model: given how long the car will be parked, compute for each
+// charger the SOC it actually reaches in that window and the cost of the energy
+// it can deliver (never charging past the target). This is the core of the
+// "which charger gets me to X% in the time I have" decision.
+export function computeDwellOptions(
+  settings: Settings,
+  startSOC: number,
+  targetSOC: number,
+  dwellHours: number,
+  baseCtx: ChargingContext,
+  extras?: ExtraOptions,
+): DwellOption[] {
+  const cap = settings.battery_capacity;
+  const kWhToTarget = kWhToAdd(startSOC, targetSOC, cap);
+
+  return buildOptionList(settings, extras).map((o) => {
+    const ctx = { ...baseCtx, isNight: o.isNightOption ?? baseCtx.isNight };
+    const reach = reachableSOC(o.power, dwellHours, startSOC, cap, o.id);
+    const meetsTarget = reach.kWhAdded >= kWhToTarget - 1e-9;
+    const effectiveKWh = Math.min(kWhToTarget, reach.kWhAdded);
+    const endSOC = meetsTarget ? targetSOC : Math.min(targetSOC, reach.endSOC);
+    const calc = calculateOption(o, effectiveKWh, startSOC, settings, ctx);
+    return { ...calc, endSOC, meetsTarget };
+  });
+}
+
+// Ranks dwell options: chargers that reach the target come first (cheapest
+// first); chargers that fall short follow, ordered by how close they get, then
+// by cost.
+export function rankDwellOptions(options: DwellOption[]): {
+  meets: DwellOption[];
+  short: DwellOption[];
+} {
+  const meets = options
+    .filter((o) => o.meetsTarget)
+    .sort((a, b) => a.total - b.total);
+  const short = options
+    .filter((o) => !o.meetsTarget)
+    .sort((a, b) => b.endSOC - a.endSOC || a.total - b.total);
+  return { meets, short };
 }
 
 export function rankOptions(

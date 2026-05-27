@@ -1,7 +1,9 @@
 import {
   calculateChargingTime,
   calculateOption,
+  computeDwellOptions,
   getAllOptions,
+  rankDwellOptions,
   rankOptions,
   reachableSOC,
   formatTime,
@@ -224,6 +226,56 @@ describe("getAllOptions / rankOptions", () => {
     const { feasible: f2, filtered } = rankOptions(calc, 0.5);
     expect(filtered.some((o) => o.id.startsWith("slow"))).toBe(true);
     expect(f2.every((o) => o.time <= 0.5 + 1e-9)).toBe(true);
+  });
+});
+
+describe("computeDwellOptions / rankDwellOptions", () => {
+  const ctx: ChargingContext = {
+    isNight: false,
+    hasFamilyParking: true,
+    parkingIsSunk: true,
+  };
+
+  test("generous dwell: every charger reaches target, cost equals charging to target", () => {
+    const opts = computeDwellOptions(settings, 40, 80, 24, ctx);
+    expect(opts.every((o) => o.meetsTarget)).toBe(true);
+    expect(opts.every((o) => o.endSOC === 80)).toBe(true);
+    const kWh = kWhToAdd(40, 80, 75);
+    const nio = opts.find((o) => o.id === "nio")!;
+    expect(nio.energy).toBeCloseTo(kWh * settings.nio_tariff, 4);
+  });
+
+  test("tight dwell: slow falls short of target, fast meets it", () => {
+    // 40->80 is 30 kWh. Quick (60 kW @0.95) needs ~0.53h; slow (7.4 kW) needs ~4h.
+    const opts = computeDwellOptions(settings, 40, 80, 0.6, ctx);
+    const slow = opts.find((o) => o.id === "slow-day")!;
+    const quick = opts.find((o) => o.id === "quick-day")!;
+    expect(slow.meetsTarget).toBe(false);
+    expect(slow.endSOC).toBeLessThan(80);
+    expect(slow.endSOC).toBeGreaterThan(40);
+    expect(quick.meetsTarget).toBe(true);
+  });
+
+  test("short charger only bills for the energy it actually delivers", () => {
+    const opts = computeDwellOptions(settings, 40, 80, 0.5, ctx);
+    const slow = opts.find((o) => o.id === "slow-day")!;
+    const fullKWh = kWhToAdd(40, 80, 75);
+    expect(slow.energy).toBeLessThan(fullKWh * settings.slow_day_tariff);
+    expect(slow.time).toBeLessThanOrEqual(0.5 + 1e-9);
+  });
+
+  test("rankDwellOptions splits meets/short and orders short by reach", () => {
+    // 2h: NIO/medium/quick reach 80%; slow (~4h) falls short.
+    const opts = computeDwellOptions(settings, 40, 80, 2, ctx);
+    const { meets, short } = rankDwellOptions(opts);
+    expect(meets.every((o) => o.meetsTarget)).toBe(true);
+    expect(short.every((o) => !o.meetsTarget)).toBe(true);
+    for (let i = 1; i < short.length; i++) {
+      expect(short[i].endSOC).toBeLessThanOrEqual(short[i - 1].endSOC + 1e-9);
+    }
+    for (let i = 1; i < meets.length; i++) {
+      expect(meets[i].total).toBeGreaterThanOrEqual(meets[i - 1].total);
+    }
   });
 });
 

@@ -87,7 +87,6 @@ const dict = {
     en: "at destination (parking sunk)",
     "zh-Hant": "在目的地 (泊車已付)",
   },
-  "decide.dwell": { en: "dwell time (hours, optional)", "zh-Hant": "停留時數 (選填)" },
   "decide.dwellPrimary": { en: "how long will you park?", "zh-Hant": "會停留多久？" },
   "decide.dwellAny": { en: "no limit", "zh-Hant": "不限" },
   "decide.hours": { en: "hours", "zh-Hant": "小時" },
@@ -97,11 +96,8 @@ const dict = {
     en: "won't reach target in this time",
     "zh-Hant": "此時間內無法達標",
   },
-  "decide.customStation": { en: "custom station", "zh-Hant": "自訂充電站" },
-  "decide.currency": { en: "currency", "zh-Hant": "貨幣" },
   "decide.price": { en: "price per kWh", "zh-Hant": "每 kWh 價格" },
   "decide.power": { en: "power (kW)", "zh-Hant": "功率 (kW)" },
-  "decide.zhuhai": { en: "going to Zhuhai", "zh-Hant": "前往珠海" },
   "decide.zhuhaiNote": {
     en: "crossing to Zhuhai? charge there — cheapest by far",
     "zh-Hant": "要過關去珠海？在當地充電最便宜",
@@ -135,7 +131,6 @@ const dict = {
     "zh-Hant": "詢問任何充電問題",
   },
   "decide.energy": { en: "energy", "zh-Hant": "電費" },
-  "decide.tooLong": { en: "too long for dwell time", "zh-Hant": "超過停留時間" },
   "decide.nightNote": {
     en: "usually pricier at night — NIO or daytime is often better",
     "zh-Hant": "夜間通常較貴，NIO 或日間多數更好",

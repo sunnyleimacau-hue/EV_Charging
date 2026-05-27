@@ -248,10 +248,9 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
 
 export interface ExtraOptions {
   custom?: { name?: string; tariff: number; power: number } | null;
-  zhuhai?: boolean;
 }
 
-// Builds the full option list: 7 base + optional custom + optional Zhuhai.
+// Builds the full option list: 7 base + optional custom station.
 function buildOptionList(settings: Settings, extras?: ExtraOptions): ChargerOption[] {
   const opts = getAllOptions(settings);
 
@@ -261,16 +260,6 @@ function buildOptionList(settings: Settings, extras?: ExtraOptions): ChargerOpti
       name: extras.custom.name ?? "custom station",
       power: extras.custom.power,
       tariff: extras.custom.tariff,
-      usesPublicParking: false,
-    });
-  }
-
-  if (extras?.zhuhai) {
-    opts.push({
-      id: "zhuhai",
-      name: "Zhuhai DC",
-      power: 60,
-      tariff: settings.rmb_to_mop,
       usesPublicParking: false,
     });
   }

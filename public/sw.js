@@ -1,6 +1,6 @@
 // Minimal service worker: caches the app shell and serves an offline fallback
 // for navigations. API requests always go to the network.
-const CACHE = "macau-ev-v1";
+const CACHE = "macau-ev-v2";
 const SHELL = ["/", "/login", "/manifest.json", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {

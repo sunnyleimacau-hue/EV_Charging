@@ -11,11 +11,16 @@ const NUMERIC_FIELDS = [
   "slow_night_tariff",
   "medium_tariff",
   "quick_tariff",
+  "nio_power_kw",
+  "slow_power_kw",
+  "medium_power_kw",
+  "quick_power_kw",
   "public_parking_day",
   "public_parking_night",
   "home_rent_monthly",
   "battery_capacity",
   "rmb_to_mop",
+  "no_target_cheap_premium",
   "daily_kwh_estimate",
 ] as const;
 

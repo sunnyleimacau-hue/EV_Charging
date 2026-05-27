@@ -149,6 +149,14 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </section>
 
           <section className={sectionCls}>
+            <p className={headingCls}>{tr("settings.powers")}</p>
+            <NumberField label={tr("settings.nioPower")} value={form.nio_power_kw} onChange={(v) => field("nio_power_kw", v)} step={0.1} suffix="kW" />
+            <NumberField label={tr("settings.slowPower")} value={form.slow_power_kw} onChange={(v) => field("slow_power_kw", v)} step={0.1} suffix="kW" />
+            <NumberField label={tr("settings.mediumPower")} value={form.medium_power_kw} onChange={(v) => field("medium_power_kw", v)} step={0.1} suffix="kW" />
+            <NumberField label={tr("settings.quickPower")} value={form.quick_power_kw} onChange={(v) => field("quick_power_kw", v)} step={0.1} suffix="kW" />
+          </section>
+
+          <section className={sectionCls}>
             <p className={headingCls}>{tr("settings.parking")}</p>
             <NumberField label={tr("settings.parkingDay")} value={form.public_parking_day} onChange={(v) => field("public_parking_day", v)} step={0.5} />
             <NumberField label={tr("settings.parkingNight")} value={form.public_parking_night} onChange={(v) => field("public_parking_night", v)} step={0.5} />
@@ -176,6 +184,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <p className={headingCls}>{tr("settings.usage")}</p>
             <NumberField label={tr("settings.rmbToMop")} value={form.rmb_to_mop} onChange={(v) => field("rmb_to_mop", v)} />
             <NumberField label={tr("settings.dailyKwh")} value={form.daily_kwh_estimate} onChange={(v) => field("daily_kwh_estimate", v)} step={0.1} suffix="kWh" />
+            <NumberField label={tr("settings.cheapPremium")} value={form.no_target_cheap_premium} onChange={(v) => field("no_target_cheap_premium", v)} step={0.1} suffix="x" />
             <Toggle label={tr("settings.wifeMode")} checked={form.wife_mode_default} onChange={(v) => field("wife_mode_default", v)} />
           </section>
 

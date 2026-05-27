@@ -18,11 +18,16 @@ export interface Settings {
   slow_night_tariff: number;
   medium_tariff: number;
   quick_tariff: number;
+  nio_power_kw: number;
+  slow_power_kw: number;
+  medium_power_kw: number;
+  quick_power_kw: number;
   public_parking_day: number;
   public_parking_night: number;
   home_rent_monthly: number;
   battery_capacity: number;
   rmb_to_mop: number;
+  no_target_cheap_premium: number;
   battery_chemistry: BatteryChemistry;
   daily_kwh_estimate: number;
   wife_mode_default: boolean;

@@ -191,14 +191,14 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "nio",
       name: "NIO charger",
-      power: 30,
+      power: settings.nio_power_kw,
       tariff: settings.nio_tariff,
       usesPublicParking: false,
     },
     {
       id: "slow-day",
       name: "slow public (day)",
-      power: 7.4,
+      power: settings.slow_power_kw,
       tariff: settings.slow_day_tariff,
       usesPublicParking: true,
       isNightOption: false,
@@ -206,7 +206,7 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "slow-night",
       name: "slow public (night)",
-      power: 7.4,
+      power: settings.slow_power_kw,
       tariff: settings.slow_night_tariff,
       usesPublicParking: true,
       isNightOption: true,
@@ -214,7 +214,7 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "medium-day",
       name: "medium public (day)",
-      power: 25,
+      power: settings.medium_power_kw,
       tariff: settings.medium_tariff,
       usesPublicParking: true,
       isNightOption: false,
@@ -222,7 +222,7 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "medium-night",
       name: "medium public (night)",
-      power: 25,
+      power: settings.medium_power_kw,
       tariff: settings.medium_tariff,
       usesPublicParking: true,
       isNightOption: true,
@@ -230,7 +230,7 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "quick-day",
       name: "quick public (day)",
-      power: 60,
+      power: settings.quick_power_kw,
       tariff: settings.quick_tariff,
       usesPublicParking: true,
       isNightOption: false,
@@ -238,7 +238,7 @@ export function getAllOptions(settings: Settings): ChargerOption[] {
     {
       id: "quick-night",
       name: "quick public (night)",
-      power: 60,
+      power: settings.quick_power_kw,
       tariff: settings.quick_tariff,
       usesPublicParking: true,
       isNightOption: true,

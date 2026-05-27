@@ -64,6 +64,15 @@ const dict = {
   "settings.theme.system": { en: "system", "zh-Hant": "系統" },
   "settings.signOut": { en: "sign out", "zh-Hant": "登出" },
   "settings.chargers": { en: "saved chargers", "zh-Hant": "已儲存充電站" },
+  "settings.powers": { en: "charger power (kW)", "zh-Hant": "充電功率 (kW)" },
+  "settings.nioPower": { en: "NIO charger", "zh-Hant": "NIO 充電" },
+  "settings.slowPower": { en: "slow public", "zh-Hant": "慢充" },
+  "settings.mediumPower": { en: "medium public", "zh-Hant": "中速" },
+  "settings.quickPower": { en: "quick public", "zh-Hant": "快充" },
+  "settings.cheapPremium": {
+    en: "\"still cheap\" premium (x)",
+    "zh-Hant": "「仍算便宜」倍數 (x)",
+  },
   "settings.notes": { en: "charging context", "zh-Hant": "充電情境" },
   "settings.notesHint": {
     en: "free notes the assistant reads when deciding — e.g. when night public is worth it, habits, preferences",

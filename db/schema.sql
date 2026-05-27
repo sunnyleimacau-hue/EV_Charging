@@ -11,11 +11,21 @@ create table settings (
   slow_night_tariff numeric not null default 1.63,
   medium_tariff numeric not null default 3.03,
   quick_tariff numeric not null default 3.45,
+  -- Charger rated power (kW). Kept in the DB so the owner / AI refine flow can
+  -- adjust them without a code change.
+  nio_power_kw numeric not null default 30,
+  slow_power_kw numeric not null default 7.4,
+  medium_power_kw numeric not null default 25,
+  quick_power_kw numeric not null default 60,
   public_parking_day numeric not null default 6,
   public_parking_night numeric not null default 3,
   home_rent_monthly numeric not null default 2700,
   battery_capacity numeric not null default 75,
   rmb_to_mop numeric not null default 1.18,
+  -- "Still cheap" premium for the no-target "most charge" mode: a charger
+  -- counts as cheap if its effective MOP/kWh is within this multiple of the
+  -- cheapest option's rate.
+  no_target_cheap_premium numeric not null default 1.5,
   battery_chemistry text default 'unknown' check (battery_chemistry in ('NMC','LFP','unknown')),
   daily_kwh_estimate numeric default 2.5,
   wife_mode_default boolean default false,
@@ -28,9 +38,15 @@ create table settings (
 
 insert into settings (id) values (1) on conflict do nothing;
 
--- Migration for existing databases (run once). Adding the column with this
--- default backfills the existing settings row with the seed text:
+-- Migrations for existing databases (run once each; safe to re-run). Adding a
+-- column with a default backfills the existing settings row.
 --   alter table settings add column if not exists charging_notes text not null default 'Daytime cost order, cheapest first: slow < medium < NIO < quick. Night public charging is usually dominated — prefer the NIO charger or wait for daytime, when destination parking is free. The real downside of night public is wasting the already-paid home spot plus the hassle of a night trip. Zhuhai is the cheapest by far — charge there only when crossing the border anyway. Battery health: 70-80% on daily charges, 100% only for long trips or LFP balancing.';
+--   alter table settings
+--     add column if not exists nio_power_kw numeric not null default 30,
+--     add column if not exists slow_power_kw numeric not null default 7.4,
+--     add column if not exists medium_power_kw numeric not null default 25,
+--     add column if not exists quick_power_kw numeric not null default 60,
+--     add column if not exists no_target_cheap_premium numeric not null default 1.5;
 
 -- Sessions: every charging event
 create table sessions (

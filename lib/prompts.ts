@@ -34,10 +34,10 @@ function setup(settings: Settings): string {
 
 function settingsBlock(s: Settings): string {
   return `Current tariffs and settings (MOP unless noted):
-- NIO charger: ${s.nio_tariff} MOP/kWh, 30 kW DC
-- Slow public AC: day ${s.slow_day_tariff}, night ${s.slow_night_tariff}
-- Medium public DC: ${s.medium_tariff} flat 24h
-- Quick public DC: ${s.quick_tariff} flat 24h
+- NIO charger: ${s.nio_tariff} MOP/kWh, ${s.nio_power_kw} kW DC
+- Slow public AC: day ${s.slow_day_tariff}, night ${s.slow_night_tariff}, ${s.slow_power_kw} kW
+- Medium public DC: ${s.medium_tariff} flat 24h, ${s.medium_power_kw} kW
+- Quick public DC: ${s.quick_tariff} flat 24h, ${s.quick_power_kw} kW
 - Zhuhai DC: ~${(s.rmb_to_mop * 1).toFixed(2)} MOP/kWh equivalent (1 RMB/kWh x ${s.rmb_to_mop} RMB->MOP)
 - Public parking: ${s.public_parking_day}/hr day, ${s.public_parking_night}/hr night
 - Home rent: ${s.home_rent_monthly}/month`;
@@ -153,5 +153,5 @@ ${settingsBlock(settings)}
 
 ${summarizeSessions(recentSessions, 20)}
 
-For each setting where the actual costs consistently diverge from the estimates, propose an update. Only propose a change when there is real evidence (multiple sessions, consistent direction). Return JSON with a "proposals" array; each item: { "field": <settings field name>, "currentValue": <number>, "suggestedValue": <number>, "evidence": <one sentence>, "confidence": "low"|"medium"|"high" }. If nothing should change, return an empty array. Use exact settings field names: nio_tariff, slow_day_tariff, slow_night_tariff, medium_tariff, quick_tariff, public_parking_day, public_parking_night, home_rent_monthly, battery_capacity, rmb_to_mop, daily_kwh_estimate.`;
+For each setting where the actual costs consistently diverge from the estimates, propose an update. Only propose a change when there is real evidence (multiple sessions, consistent direction). Return JSON with a "proposals" array; each item: { "field": <settings field name>, "currentValue": <number>, "suggestedValue": <number>, "evidence": <one sentence>, "confidence": "low"|"medium"|"high" }. If nothing should change, return an empty array. Use exact settings field names: nio_tariff, slow_day_tariff, slow_night_tariff, medium_tariff, quick_tariff, nio_power_kw, slow_power_kw, medium_power_kw, quick_power_kw, public_parking_day, public_parking_night, home_rent_monthly, battery_capacity, rmb_to_mop, no_target_cheap_premium, daily_kwh_estimate.`;
 }

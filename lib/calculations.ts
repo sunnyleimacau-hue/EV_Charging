@@ -289,6 +289,8 @@ export interface DwellOption extends CalculatedOption {
   endSOC: number;
   // Whether this charger reaches the target within the dwell window.
   meetsTarget: boolean;
+  // Energy actually delivered in the window (kWh) — what `total`/`endSOC` reflect.
+  kWhAdded: number;
 }
 
 // Dwell-first model: given how long the car will be parked, compute for each
@@ -313,7 +315,7 @@ export function computeDwellOptions(
     const effectiveKWh = Math.min(kWhToTarget, reach.kWhAdded);
     const endSOC = meetsTarget ? targetSOC : Math.min(targetSOC, reach.endSOC);
     const calc = calculateOption(o, effectiveKWh, startSOC, settings, ctx);
-    return { ...calc, endSOC, meetsTarget };
+    return { ...calc, endSOC, meetsTarget, kWhAdded: effectiveKWh };
   });
 }
 
@@ -331,6 +333,36 @@ export function rankDwellOptions(options: DwellOption[]): {
     .filter((o) => !o.meetsTarget)
     .sort((a, b) => b.endSOC - a.endSOC || a.total - b.total);
   return { meets, short };
+}
+
+export type NoTargetMode = "cheapest" | "most";
+
+// Ranks options when there is no target SOC — you're parked anyway and just
+// want either the cheapest energy per kWh, or the most charge that's still
+// cheap. For "most", a charger counts as cheap when its effective rate is
+// within `cheapPremium` of the cheapest option's rate (so it won't pick a
+// rip-off just to add more kWh); cheap options are ranked by energy added.
+export function rankNoTarget(
+  options: DwellOption[],
+  mode: NoTargetMode,
+  cheapPremium: number,
+): DwellOption[] {
+  if (options.length === 0) return [];
+
+  if (mode === "cheapest") {
+    return [...options].sort(
+      (a, b) => a.mopPerKwh - b.mopPerKwh || b.kWhAdded - a.kWhAdded,
+    );
+  }
+
+  const cheapestRate = Math.min(...options.map((o) => o.mopPerKwh));
+  const threshold = cheapestRate * cheapPremium + 1e-9;
+  return [...options].sort((a, b) => {
+    const aCheap = a.mopPerKwh <= threshold;
+    const bCheap = b.mopPerKwh <= threshold;
+    if (aCheap !== bCheap) return aCheap ? -1 : 1;
+    return b.kWhAdded - a.kWhAdded || a.mopPerKwh - b.mopPerKwh;
+  });
 }
 
 export function rankOptions(

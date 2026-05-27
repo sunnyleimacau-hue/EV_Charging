@@ -4,6 +4,7 @@ import {
   computeDwellOptions,
   getAllOptions,
   rankDwellOptions,
+  rankNoTarget,
   rankOptions,
   reachableSOC,
   formatTime,
@@ -282,6 +283,46 @@ describe("computeDwellOptions / rankDwellOptions", () => {
     for (let i = 1; i < meets.length; i++) {
       expect(meets[i].total).toBeGreaterThanOrEqual(meets[i - 1].total);
     }
+  });
+});
+
+describe("rankNoTarget", () => {
+  const ctx: ChargingContext = {
+    isNight: false,
+    hasFamilyParking: true,
+    parkingIsSunk: true,
+  };
+
+  // Daytime: only day options are visible (the tab hides night variants).
+  const dayOnly = (opts: ReturnType<typeof computeDwellOptions>) =>
+    opts.filter((o) => o.isNightOption !== true);
+
+  test("cheapest mode picks the lowest effective MOP/kWh (slow day, sunk parking)", () => {
+    // No target -> compute to 100% over a 1h window; rank by rate.
+    const opts = dayOnly(computeDwellOptions(settings, 40, 100, 1, ctx));
+    const ranked = rankNoTarget(opts, "cheapest", settings.no_target_cheap_premium);
+    expect(ranked[0].id).toBe("slow-day");
+    for (let i = 1; i < ranked.length; i++) {
+      expect(ranked[i].mopPerKwh).toBeGreaterThanOrEqual(ranked[i - 1].mopPerKwh - 1e-9);
+    }
+  });
+
+  test("most mode adds the most kWh among options within the cheap premium", () => {
+    // 1h window from 40%: quick (3.45) exceeds 2.29*1.5=3.435 and is excluded;
+    // among slow/medium/NIO, NIO (30 kW) adds the most.
+    const opts = dayOnly(computeDwellOptions(settings, 40, 100, 1, ctx));
+    const ranked = rankNoTarget(opts, "most", 1.5);
+    expect(ranked[0].id).toBe("nio");
+    expect(ranked[0].kWhAdded).toBeGreaterThan(
+      ranked.find((o) => o.id === "slow-day")!.kWhAdded,
+    );
+  });
+
+  test("most mode falls back to cheapest when the window fills every charger", () => {
+    // Unlimited time -> all reach 100%, identical kWh -> cheapest rate wins.
+    const opts = dayOnly(computeDwellOptions(settings, 40, 100, 1e6, ctx));
+    const ranked = rankNoTarget(opts, "most", 1.5);
+    expect(ranked[0].id).toBe("slow-day");
   });
 });
 

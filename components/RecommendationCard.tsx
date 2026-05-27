@@ -2,22 +2,25 @@
 
 import { AlertTriangle, Check } from "lucide-react";
 import { useApp } from "./AppContext";
-import { formatMOP, formatTime, type CalculatedOption } from "@/lib/calculations";
+import { formatMOP, formatTime, type DwellOption } from "@/lib/calculations";
 
 export default function RecommendationCard({
   option,
+  targetSOC,
   reasoning,
   warnings,
   onStart,
   compact,
 }: {
-  option: CalculatedOption;
+  option: DwellOption;
+  targetSOC: number;
   reasoning?: string;
   warnings?: string[];
-  onStart: (o: CalculatedOption) => void;
+  onStart: (o: DwellOption) => void;
   compact?: boolean;
 }) {
   const { tr } = useApp();
+  const short = !option.meetsTarget;
 
   return (
     <div className="rounded-2xl border border-green-500 bg-green-50 p-4 dark:border-green-600 dark:bg-green-950/30">
@@ -32,9 +35,15 @@ export default function RecommendationCard({
           </p>
         )}
       </div>
-      {!compact && (
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          {formatTime(option.time)} · {option.mopPerKwh.toFixed(2)} MOP/kWh
+      <p className="text-sm text-gray-600 dark:text-gray-300">
+        {tr("decide.reaches")} {Math.round(option.endSOC)}%
+        {short && ` (${tr("decide.target")} ${targetSOC}%)`}
+        {!compact && ` · ${formatTime(option.time)} · ${option.mopPerKwh.toFixed(2)} MOP/kWh`}
+      </p>
+      {short && (
+        <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {tr("decide.shortOfTarget")}
         </p>
       )}
 

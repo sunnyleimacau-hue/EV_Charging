@@ -14,10 +14,10 @@ import OptionRow from "../OptionRow";
 import RecommendationCard from "../RecommendationCard";
 import AskBox from "../AskBox";
 import {
-  computeOptions,
+  computeDwellOptions,
   kWhToAdd,
-  rankOptions,
-  type CalculatedOption,
+  rankDwellOptions,
+  type DwellOption,
 } from "@/lib/calculations";
 import type { ChargerType as DbChargerType, Recommendation } from "@/lib/types";
 
@@ -65,6 +65,50 @@ function SocSlider({
   );
 }
 
+const DWELL_PRESETS = [0.5, 1, 2, 4, 8];
+
+function DwellPicker({
+  value,
+  onChange,
+  hoursLabel,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  hoursLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {DWELL_PRESETS.map((h) => (
+        <button
+          key={h}
+          type="button"
+          onClick={() => onChange(h)}
+          className={`rounded-full px-3 py-1 text-sm ${
+            value === h
+              ? "bg-green-600 text-white"
+              : "border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+          }`}
+        >
+          {h % 1 === 0 ? h : h.toFixed(1)}h
+        </button>
+      ))}
+      <input
+        type="number"
+        inputMode="decimal"
+        step={0.5}
+        min={0.25}
+        value={value}
+        onChange={(e) => {
+          const n = parseFloat(e.target.value);
+          onChange(Number.isFinite(n) && n > 0 ? n : 0.25);
+        }}
+        aria-label={hoursLabel}
+        className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-right text-sm outline-none focus:border-green-500 dark:border-gray-700 dark:bg-gray-900"
+      />
+    </div>
+  );
+}
+
 function Collapsible({
   title,
   open,
@@ -101,10 +145,10 @@ export default function DecideTab() {
 
   const [currentSOC, setCurrentSOC] = useState(40);
   const [targetSOC, setTargetSOC] = useState(80);
+  const [dwell, setDwell] = useState(2);
   const [night, setNight] = useState(isNightNow());
   const [familyParking, setFamilyParking] = useState(true);
   const [parkingSunk, setParkingSunk] = useState(true);
-  const [dwell, setDwell] = useState<number | "">("");
 
   const [customOn, setCustomOn] = useState(false);
   const [customCurrency, setCustomCurrency] = useState<"MOP" | "RMB">("MOP");
@@ -128,14 +172,15 @@ export default function DecideTab() {
   const customTariffMop =
     customCurrency === "RMB" ? customPrice * s.rmb_to_mop : customPrice;
 
-  const dwellHours = dwell === "" ? undefined : Number(dwell);
+  const dwellHours = dwell > 0 ? dwell : 0.25;
 
   const allOptions = useMemo(
     () =>
-      computeOptions(
+      computeDwellOptions(
         s,
-        kWhNeeded,
         currentSOC,
+        effectiveTarget,
+        dwellHours,
         {
           isNight: night,
           hasFamilyParking: familyParking,
@@ -150,12 +195,12 @@ export default function DecideTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       s,
-      kWhNeeded,
       currentSOC,
+      effectiveTarget,
+      dwellHours,
       night,
       familyParking,
       parkingSunk,
-      dwellHours,
       customOn,
       customTariffMop,
       customPower,
@@ -167,7 +212,8 @@ export default function DecideTab() {
   const visible = allOptions.filter(
     (o) => showAll || night || o.isNightOption !== true,
   );
-  const { feasible, filtered } = rankOptions(visible, dwellHours);
+  const { meets, short } = rankDwellOptions(visible);
+  const ranked = [...meets, ...short];
 
   const warnings = useMemo(() => {
     const w: string[] = [];
@@ -215,10 +261,10 @@ export default function DecideTab() {
   }, [
     currentSOC,
     targetSOC,
+    dwellHours,
     night,
     familyParking,
     parkingSunk,
-    dwellHours,
     customOn,
     customTariffMop,
     customPower,
@@ -226,16 +272,14 @@ export default function DecideTab() {
     kWhNeeded,
   ]);
 
-  // Nighttime public charging is always dominated, so it can never be the
-  // recommended winner (only NIO is acceptable at night). It stays visible in
-  // the comparison, flagged, for transparency.
-  const recommendable = feasible.filter((o) => o.isNightOption !== true);
-  const winner: CalculatedOption | undefined =
-    (reco && recommendable.find((o) => o.id === reco.winner)) ||
-    recommendable[0] ||
-    feasible[0];
+  // Winner: LLM pick if it matches a computed option, else the best ranked
+  // option (cheapest that reaches target, else the one that gets closest). No
+  // hard exclusions — night public can win when the model judges it sensible.
+  const winner: DwellOption | undefined =
+    (reco && ranked.find((o) => o.id === reco.winner)) || meets[0] || short[0];
 
-  async function startCharging(option: CalculatedOption) {
+  async function startCharging(option: DwellOption) {
+    const kwh = option.tariff > 0 ? option.energy / option.tariff : 0;
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
@@ -246,8 +290,8 @@ export default function DecideTab() {
           power_kw: option.power,
           tariff_mop_per_kwh: option.tariff,
           start_soc: currentSOC,
-          target_soc: effectiveTarget,
-          estimated_kwh: kWhNeeded,
+          target_soc: Math.round(option.endSOC),
+          estimated_kwh: kwh,
           estimated_cost: option.total,
           duration_hours: option.time,
           was_night: option.isNightOption ?? night,
@@ -314,7 +358,7 @@ export default function DecideTab() {
         </div>
       )}
 
-      {/* SOC sliders */}
+      {/* SOC sliders + dwell — the core inputs */}
       <div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
         <SocSlider
           label={tr("decide.currentSOC")}
@@ -331,6 +375,12 @@ export default function DecideTab() {
             min={currentSOC}
             onChange={setTargetSOC}
           />
+        </div>
+        <div className="mt-4">
+          <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">
+            {tr("decide.dwellPrimary")}
+          </p>
+          <DwellPicker value={dwell} onChange={setDwell} hoursLabel={tr("decide.hours")} />
         </div>
         <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
           {tr("decide.toAdd")}:{" "}
@@ -355,6 +405,7 @@ export default function DecideTab() {
           )}
           <RecommendationCard
             option={winner}
+            targetSOC={effectiveTarget}
             reasoning={reco?.reasoning}
             warnings={
               reco?.warnings && reco.warnings.length ? reco.warnings : warnings
@@ -390,21 +441,6 @@ export default function DecideTab() {
                 onChange={setParkingSunk}
               />
             </div>
-            <label className="flex items-center justify-between gap-3">
-              <span className="text-sm text-gray-600 dark:text-gray-300">
-                {tr("decide.dwell")}
-              </span>
-              <input
-                type="number"
-                step={0.5}
-                min={0}
-                value={dwell}
-                onChange={(e) =>
-                  setDwell(e.target.value === "" ? "" : parseFloat(e.target.value))
-                }
-                className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-right text-sm dark:border-gray-700 dark:bg-gray-900"
-              />
-            </label>
 
             <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
               <Toggle
@@ -485,25 +521,14 @@ export default function DecideTab() {
                 </button>
               </div>
               <div className="space-y-2">
-                {feasible.map((o) => {
-                  const nightPublic = o.isNightOption === true;
-                  return (
-                    <OptionRow
-                      key={o.id}
-                      option={o}
-                      isWinner={o.id === winner.id}
-                      showBreakdown={showBreakdown}
-                      note={nightPublic ? tr("decide.nightNote") : undefined}
-                      onStart={nightPublic ? undefined : startCharging}
-                    />
-                  );
-                })}
-                {filtered.map((o) => (
+                {ranked.map((o) => (
                   <OptionRow
                     key={o.id}
                     option={o}
-                    disabled
+                    targetSOC={effectiveTarget}
+                    isWinner={o.id === winner.id}
                     showBreakdown={showBreakdown}
+                    onStart={startCharging}
                   />
                 ))}
               </div>

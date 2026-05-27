@@ -1,45 +1,42 @@
 "use client";
 
 import { useApp } from "./AppContext";
-import { formatMOP, formatTime, type CalculatedOption } from "@/lib/calculations";
+import { formatMOP, formatTime, type DwellOption } from "@/lib/calculations";
 
 export default function OptionRow({
   option,
+  targetSOC,
   isWinner,
   showBreakdown,
-  disabled,
-  note,
   onStart,
 }: {
-  option: CalculatedOption;
+  option: DwellOption;
+  targetSOC: number;
   isWinner?: boolean;
   showBreakdown?: boolean;
-  disabled?: boolean;
-  note?: string;
-  onStart?: (o: CalculatedOption) => void;
+  onStart?: (o: DwellOption) => void;
 }) {
   const { tr } = useApp();
+  const short = !option.meetsTarget;
 
   return (
     <div
       className={`rounded-xl border p-3 ${
         isWinner
           ? "border-green-500 bg-green-50 dark:border-green-600 dark:bg-green-950/30"
-          : "border-gray-200 dark:border-gray-800"
-      } ${disabled ? "opacity-50" : ""}`}
+          : short
+            ? "border-amber-300 dark:border-amber-800/60"
+            : "border-gray-200 dark:border-gray-800"
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{option.name}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
+            {tr("decide.reaches")} {Math.round(option.endSOC)}%
+            {short && ` (${tr("decide.target")} ${targetSOC}%)`} ·{" "}
             {formatTime(option.time)} · {option.mopPerKwh.toFixed(2)} MOP/kWh
-            {disabled && ` · ${tr("decide.tooLong")}`}
           </p>
-          {note && (
-            <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-              {note}
-            </p>
-          )}
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold tabular-nums">
@@ -56,7 +53,7 @@ export default function OptionRow({
         </div>
       )}
 
-      {onStart && !disabled && (
+      {onStart && (
         <button
           onClick={() => onStart(option)}
           className={`mt-2 h-9 w-full rounded-md text-sm font-medium ${

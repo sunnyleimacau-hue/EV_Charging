@@ -26,6 +26,7 @@ export interface Settings {
   battery_chemistry: BatteryChemistry;
   daily_kwh_estimate: number;
   wife_mode_default: boolean;
+  charging_notes: string;
   updated_at: string;
 }
 

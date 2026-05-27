@@ -66,6 +66,17 @@ export async function PUT(req: Request) {
     update.wife_mode_default = Boolean(body.wife_mode_default);
   }
 
+  if (body.charging_notes != null) {
+    const v = String(body.charging_notes);
+    if (v.length > 2000) {
+      return NextResponse.json(
+        { error: "charging_notes too long (max 2000 chars)" },
+        { status: 400 },
+      );
+    }
+    update.charging_notes = v;
+  }
+
   update.updated_at = new Date().toISOString();
 
   try {

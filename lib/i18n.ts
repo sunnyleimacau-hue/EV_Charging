@@ -64,6 +64,15 @@ const dict = {
   "settings.theme.system": { en: "system", "zh-Hant": "系統" },
   "settings.signOut": { en: "sign out", "zh-Hant": "登出" },
   "settings.chargers": { en: "saved chargers", "zh-Hant": "已儲存充電站" },
+  "settings.notes": { en: "charging context", "zh-Hant": "充電情境" },
+  "settings.notesHint": {
+    en: "free notes the assistant reads when deciding — e.g. when night public is worth it, habits, preferences",
+    "zh-Hant": "助手決策時會參考的自由筆記，例如何時值得夜間公共充電、習慣、偏好",
+  },
+  "settings.notesPlaceholder": {
+    en: "e.g. on nights with family parking, night public can be fine if we need a quick top-up",
+    "zh-Hant": "例如：有家用車位的晚上，若需快速補電，夜間公共充電也可以",
+  },
 
   "decide.currentSOC": { en: "current SOC", "zh-Hant": "目前電量" },
   "decide.targetSOC": { en: "target SOC", "zh-Hant": "目標電量" },

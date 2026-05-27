@@ -179,6 +179,19 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <Toggle label={tr("settings.wifeMode")} checked={form.wife_mode_default} onChange={(v) => field("wife_mode_default", v)} />
           </section>
 
+          <section className={sectionCls}>
+            <p className={headingCls}>{tr("settings.notes")}</p>
+            <p className="mb-2 text-xs text-gray-400">{tr("settings.notesHint")}</p>
+            <textarea
+              value={form.charging_notes ?? ""}
+              onChange={(e) => field("charging_notes", e.target.value)}
+              rows={4}
+              maxLength={2000}
+              placeholder={tr("settings.notesPlaceholder")}
+              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-green-500 dark:border-gray-700 dark:bg-gray-900"
+            />
+          </section>
+
           <button
             onClick={save}
             disabled={saving}

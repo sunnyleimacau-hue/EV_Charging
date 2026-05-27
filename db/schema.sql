@@ -19,11 +19,16 @@ create table settings (
   battery_chemistry text default 'unknown' check (battery_chemistry in ('NMC','LFP','unknown')),
   daily_kwh_estimate numeric default 2.5,
   wife_mode_default boolean default false,
+  -- Free-text living context the AI reads when recommending / answering chat.
+  charging_notes text not null default '',
   updated_at timestamptz not null default now(),
   constraint single_row check (id = 1)
 );
 
 insert into settings (id) values (1) on conflict do nothing;
+
+-- Migration for existing databases (run once; safe to re-run):
+--   alter table settings add column if not exists charging_notes text not null default '';
 
 -- Sessions: every charging event
 create table sessions (

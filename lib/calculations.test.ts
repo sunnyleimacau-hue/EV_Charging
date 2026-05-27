@@ -29,6 +29,7 @@ const settings: Settings = {
   battery_chemistry: "unknown",
   daily_kwh_estimate: 2.5,
   wife_mode_default: false,
+  charging_notes: "",
   updated_at: "2026-01-01T00:00:00Z",
 };
 

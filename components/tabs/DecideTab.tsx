@@ -15,6 +15,8 @@ import RecommendationCard from "../RecommendationCard";
 import AskBox from "../AskBox";
 import {
   computeDwellOptions,
+  formatMOP,
+  formatTime,
   kWhToAdd,
   rankDwellOptions,
   type DwellOption,
@@ -155,7 +157,6 @@ export default function DecideTab() {
   const [customPrice, setCustomPrice] = useState<number>(1.4);
   const [customPower, setCustomPower] = useState<number>(11);
 
-  const [zhuhai, setZhuhai] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
@@ -189,7 +190,6 @@ export default function DecideTab() {
         },
         {
           custom: customOn ? { tariff: customTariffMop, power: customPower } : null,
-          zhuhai,
         },
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -204,7 +204,6 @@ export default function DecideTab() {
       customOn,
       customTariffMop,
       customPower,
-      zhuhai,
     ],
   );
 
@@ -214,6 +213,23 @@ export default function DecideTab() {
   );
   const { meets, short } = rankDwellOptions(visible);
   const ranked = [...meets, ...short];
+
+  // "Is this charger worth it?" verdict for the custom station, comparing it to
+  // the cheapest non-custom option that also reaches the target.
+  const customOpt = customOn ? allOptions.find((o) => o.id === "custom") : undefined;
+  const worthIt = useMemo(() => {
+    if (!customOpt) return null;
+    if (!customOpt.meetsTarget) return { kind: "short" as const };
+    const bestOther = meets.find((o) => o.id !== "custom");
+    if (!bestOther || customOpt.total <= bestOther.total + 1e-9) {
+      return { kind: "best" as const };
+    }
+    return {
+      kind: "pricier" as const,
+      name: bestOther.name,
+      delta: customOpt.total - bestOther.total,
+    };
+  }, [customOpt, meets]);
 
   const warnings = useMemo(() => {
     const w: string[] = [];
@@ -247,7 +263,6 @@ export default function DecideTab() {
               custom: customOn
                 ? { tariff: customTariffMop, power: customPower }
                 : null,
-              zhuhai,
             },
           }),
         });
@@ -268,7 +283,6 @@ export default function DecideTab() {
     customOn,
     customTariffMop,
     customPower,
-    zhuhai,
     kWhNeeded,
   ]);
 
@@ -314,7 +328,6 @@ export default function DecideTab() {
     hasFamilyParking: familyParking,
     parkingIsSunk: parkingSunk,
     dwellHours,
-    goingToZhuhai: zhuhai,
     wifeMode,
   };
 
@@ -444,7 +457,7 @@ export default function DecideTab() {
 
             <div className="border-t border-gray-100 pt-3 dark:border-gray-800">
               <Toggle
-                label={tr("decide.customStation")}
+                label={tr("decide.worthItTitle")}
                 checked={customOn}
                 onChange={setCustomOn}
               />
@@ -483,17 +496,41 @@ export default function DecideTab() {
                       ≈ {customTariffMop.toFixed(2)} MOP/kWh
                     </p>
                   )}
+                  {customOpt && worthIt && (
+                    <div className="rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
+                      <p className="font-medium">
+                        {tr("decide.reaches")} {Math.round(customOpt.endSOC)}% ·{" "}
+                        {formatMOP(customOpt.total)} · {formatTime(customOpt.time)}
+                      </p>
+                      {worthIt.kind === "short" && (
+                        <p className="mt-1 text-amber-700 dark:text-amber-400">
+                          {tr("decide.shortOfTarget")}
+                        </p>
+                      )}
+                      {worthIt.kind === "best" && (
+                        <p className="mt-1 text-green-700 dark:text-green-400">
+                          {tr("decide.verdictBest")}
+                        </p>
+                      )}
+                      {worthIt.kind === "pricier" && (
+                        <p className="mt-1 text-gray-600 dark:text-gray-300">
+                          {tr("decide.verdictPricierThan")} {worthIt.name} (+
+                          {formatMOP(worthIt.delta)})
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
-              <div className="mt-2">
-                <Toggle
-                  label={tr("decide.zhuhai")}
-                  checked={zhuhai}
-                  onChange={setZhuhai}
-                />
-              </div>
             </div>
           </Collapsible>
+
+          {/* Standing verdict: Zhuhai is always cheapest if you're crossing anyway */}
+          <div className="rounded-2xl border border-gray-200 px-4 py-3 text-sm dark:border-gray-800">
+            <p className="text-gray-600 dark:text-gray-300">
+              🇨🇳 {tr("decide.zhuhaiNote")} · ~{s.rmb_to_mop.toFixed(2)} MOP/kWh
+            </p>
+          </div>
 
           {kWhNeeded > 0 && winner && (
             <Collapsible

@@ -101,6 +101,20 @@ const dict = {
   "decide.price": { en: "price per kWh", "zh-Hant": "每 kWh 價格" },
   "decide.power": { en: "power (kW)", "zh-Hant": "功率 (kW)" },
   "decide.zhuhai": { en: "going to Zhuhai", "zh-Hant": "前往珠海" },
+  "decide.zhuhaiNote": {
+    en: "crossing to Zhuhai? charge there — cheapest by far",
+    "zh-Hant": "要過關去珠海？在當地充電最便宜",
+  },
+  "decide.worthItTitle": {
+    en: "is this charger worth it?",
+    "zh-Hant": "這個充電站值得嗎？",
+  },
+  "decide.verdictBest": {
+    en: "best value — cheapest that reaches your target",
+    "zh-Hant": "最划算，達標選項中最便宜",
+  },
+  "decide.verdictCheaperThan": { en: "cheaper than", "zh-Hant": "比這個便宜：" },
+  "decide.verdictPricierThan": { en: "pricier than", "zh-Hant": "比這個貴：" },
   "decide.simple": { en: "simple", "zh-Hant": "簡易" },
   "decide.detailed": { en: "detailed", "zh-Hant": "詳細" },
   "decide.simpleTagline": {

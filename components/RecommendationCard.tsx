@@ -7,6 +7,7 @@ import { formatMOP, formatTime, type DwellOption } from "@/lib/calculations";
 export default function RecommendationCard({
   option,
   targetSOC,
+  noTarget,
   reasoning,
   warnings,
   onStart,
@@ -14,13 +15,14 @@ export default function RecommendationCard({
 }: {
   option: DwellOption;
   targetSOC: number;
+  noTarget?: boolean;
   reasoning?: string;
   warnings?: string[];
   onStart: (o: DwellOption) => void;
   compact?: boolean;
 }) {
   const { tr } = useApp();
-  const short = !option.meetsTarget;
+  const short = !noTarget && !option.meetsTarget;
 
   return (
     <div className="rounded-2xl border border-green-500 bg-green-50 p-4 dark:border-green-600 dark:bg-green-950/30">
@@ -38,6 +40,7 @@ export default function RecommendationCard({
       <p className="text-sm text-gray-600 dark:text-gray-300">
         {tr("decide.reaches")} {Math.round(option.endSOC)}%
         {short && ` (${tr("decide.target")} ${targetSOC}%)`}
+        {noTarget && ` · ${tr("decide.adds")} ${option.kWhAdded.toFixed(0)} kWh`}
         {!compact && ` · ${formatTime(option.time)} · ${option.mopPerKwh.toFixed(2)} MOP/kWh`}
       </p>
       {short && (

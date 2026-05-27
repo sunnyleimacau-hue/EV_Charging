@@ -105,6 +105,10 @@ const dict = {
     en: "won't reach target in this time",
     "zh-Hant": "此時間內無法達標",
   },
+  "decide.noTarget": { en: "no target — just charge cheaply", "zh-Hant": "無目標 — 只求便宜充電" },
+  "decide.modeCheapest": { en: "cheapest energy", "zh-Hant": "最便宜電量" },
+  "decide.modeMost": { en: "most charge (still cheap)", "zh-Hant": "最多電量 (仍便宜)" },
+  "decide.adds": { en: "adds", "zh-Hant": "充入" },
   "decide.price": { en: "price per kWh", "zh-Hant": "每 kWh 價格" },
   "decide.power": { en: "power (kW)", "zh-Hant": "功率 (kW)" },
   "decide.zhuhaiNote": {

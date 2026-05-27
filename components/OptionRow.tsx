@@ -6,6 +6,7 @@ import { formatMOP, formatTime, type DwellOption } from "@/lib/calculations";
 export default function OptionRow({
   option,
   targetSOC,
+  noTarget,
   isWinner,
   showBreakdown,
   note,
@@ -13,13 +14,14 @@ export default function OptionRow({
 }: {
   option: DwellOption;
   targetSOC: number;
+  noTarget?: boolean;
   isWinner?: boolean;
   showBreakdown?: boolean;
   note?: string;
   onStart?: (o: DwellOption) => void;
 }) {
   const { tr } = useApp();
-  const short = !option.meetsTarget;
+  const short = !noTarget && !option.meetsTarget;
 
   return (
     <div
@@ -36,7 +38,8 @@ export default function OptionRow({
           <p className="truncate text-sm font-medium">{option.name}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {tr("decide.reaches")} {Math.round(option.endSOC)}%
-            {short && ` (${tr("decide.target")} ${targetSOC}%)`} ·{" "}
+            {short && ` (${tr("decide.target")} ${targetSOC}%)`}
+            {noTarget && ` · ${tr("decide.adds")} ${option.kWhAdded.toFixed(0)} kWh`} ·{" "}
             {formatTime(option.time)} · {option.mopPerKwh.toFixed(2)} MOP/kWh
           </p>
           {note && (

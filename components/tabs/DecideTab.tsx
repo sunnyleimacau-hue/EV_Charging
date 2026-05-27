@@ -19,7 +19,9 @@ import {
   formatTime,
   kWhToAdd,
   rankDwellOptions,
+  rankNoTarget,
   type DwellOption,
+  type NoTargetMode,
 } from "@/lib/calculations";
 import type { ChargerType as DbChargerType, Recommendation } from "@/lib/types";
 
@@ -161,6 +163,10 @@ export default function DecideTab() {
 
   const [currentSOC, setCurrentSOC] = useState(40);
   const [targetSOC, setTargetSOC] = useState(80);
+  // No specific target: you're parked anyway and just want the cheapest energy,
+  // or the most charge that's still cheap.
+  const [noTarget, setNoTarget] = useState(false);
+  const [noTargetMode, setNoTargetMode] = useState<NoTargetMode>("cheapest");
   // Dwell is the prominent primary input but can be cleared; blank means "time
   // is not a constraint" (rank purely by cost, today's behavior).
   const [dwell, setDwell] = useState<number | "">(2);
@@ -184,6 +190,9 @@ export default function DecideTab() {
 
   // Target is clamped to >= current via slider min and the current-SOC handler.
   const effectiveTarget = Math.max(targetSOC, currentSOC);
+  // With no target, compute toward 100% so each charger reports whatever it can
+  // add in the window; the ranking (not a target) decides the winner.
+  const computeTarget = noTarget ? 100 : effectiveTarget;
   const kWhNeeded = kWhToAdd(currentSOC, effectiveTarget, s.battery_capacity);
 
   const customTariffMop =
@@ -199,7 +208,7 @@ export default function DecideTab() {
       computeDwellOptions(
         s,
         currentSOC,
-        effectiveTarget,
+        computeTarget,
         dwellHours,
         {
           isNight: night,
@@ -215,7 +224,7 @@ export default function DecideTab() {
     [
       s,
       currentSOC,
-      effectiveTarget,
+      computeTarget,
       dwellHours,
       night,
       familyParking,
@@ -230,8 +239,12 @@ export default function DecideTab() {
   const visible = allOptions.filter(
     (o) => showAll || night || o.isNightOption !== true,
   );
+  // With a target: reach-target options first, then short ones. With no target:
+  // rank by the chosen objective (cheapest energy or most charge still cheap).
   const { meets, short } = rankDwellOptions(visible);
-  const ranked = [...meets, ...short];
+  const ranked = noTarget
+    ? rankNoTarget(visible, noTargetMode, s.no_target_cheap_premium)
+    : [...meets, ...short];
 
   // "Is this charger worth it?" verdict for the custom station, comparing it to
   // the cheapest non-custom option that also reaches the target.
@@ -259,8 +272,9 @@ export default function DecideTab() {
   }, [targetSOC, currentSOC, tr]);
 
   // Fetch the LLM recommendation (debounced). Falls back deterministically.
+  // No-target decisions are deterministic (pure ranking), so skip the AI there.
   useEffect(() => {
-    if (kWhNeeded <= 0) {
+    if (kWhNeeded <= 0 || noTarget) {
       setReco(null);
       return;
     }
@@ -303,13 +317,39 @@ export default function DecideTab() {
     customTariffMop,
     customPower,
     kWhNeeded,
+    noTarget,
   ]);
 
-  // Winner: LLM pick if it matches a computed option, else the best ranked
-  // option (cheapest that reaches target, else the one that gets closest). No
-  // hard exclusions — night public can win when the model judges it sensible.
-  const winner: DwellOption | undefined =
-    (reco && ranked.find((o) => o.id === reco.winner)) || meets[0] || short[0];
+  // Winner. With a target: LLM pick if it matches a computed option, else the
+  // best ranked option (cheapest that reaches target, else closest) — no hard
+  // exclusions, so night public can win when the model judges it sensible. With
+  // no target: the top of the chosen ranking (deterministic).
+  const winner: DwellOption | undefined = noTarget
+    ? ranked[0]
+    : (reco && ranked.find((o) => o.id === reco.winner)) || meets[0] || short[0];
+
+  const noTargetReasoning =
+    winner && noTarget
+      ? noTargetMode === "cheapest"
+        ? `Cheapest energy at ${winner.mopPerKwh.toFixed(2)} MOP/kWh — adds ${winner.kWhAdded.toFixed(
+            0,
+          )} kWh (→ ${Math.round(winner.endSOC)}%).`
+        : `Most charge while staying cheap — adds ${winner.kWhAdded.toFixed(
+            0,
+          )} kWh (→ ${Math.round(winner.endSOC)}%) at ${winner.mopPerKwh.toFixed(2)} MOP/kWh.`
+      : undefined;
+
+  const displayWarnings = noTarget
+    ? (() => {
+        const w: string[] = [];
+        if (winner && winner.endSOC >= 100) w.push(tr("warn.target100"));
+        else if (winner && winner.endSOC > 90) w.push(tr("warn.target90"));
+        if (currentSOC < 15) w.push(tr("warn.low"));
+        return w;
+      })()
+    : reco?.warnings && reco.warnings.length
+      ? reco.warnings
+      : warnings;
 
   async function startCharging(option: DwellOption) {
     const kwh = option.tariff > 0 ? option.energy / option.tariff : 0;
@@ -411,24 +451,53 @@ export default function DecideTab() {
             anyLabel={tr("decide.dwellAny")}
           />
         </div>
-        <div className="mt-4">
-          <SocSlider
-            label={tr("decide.targetSOC")}
-            value={targetSOC}
-            min={currentSOC}
-            onChange={setTargetSOC}
+        {!noTarget && (
+          <div className="mt-4">
+            <SocSlider
+              label={tr("decide.targetSOC")}
+              value={targetSOC}
+              min={currentSOC}
+              onChange={setTargetSOC}
+            />
+          </div>
+        )}
+        <div className="mt-3">
+          <Checkbox
+            label={tr("decide.noTarget")}
+            checked={noTarget}
+            onChange={setNoTarget}
           />
+          {noTarget && (
+            <div className="mt-2 flex gap-1.5">
+              {(["cheapest", "most"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setNoTargetMode(m)}
+                  className={`rounded-full px-3 py-1 text-sm ${
+                    noTargetMode === m
+                      ? "bg-green-600 text-white"
+                      : "border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  {m === "cheapest" ? tr("decide.modeCheapest") : tr("decide.modeMost")}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
-          {tr("decide.toAdd")}:{" "}
-          <span className="font-semibold text-gray-900 dark:text-gray-100">
-            {kWhNeeded.toFixed(1)} kWh
-          </span>
-        </p>
+        {!noTarget && (
+          <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
+            {tr("decide.toAdd")}:{" "}
+            <span className="font-semibold text-gray-900 dark:text-gray-100">
+              {kWhNeeded.toFixed(1)} kWh
+            </span>
+          </p>
+        )}
       </div>
 
       {/* Recommendation — always front and center */}
-      {kWhNeeded <= 0 ? (
+      {!noTarget && kWhNeeded <= 0 ? (
         <p className="rounded-xl border border-gray-200 p-4 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
           already at target
         </p>
@@ -443,10 +512,9 @@ export default function DecideTab() {
           <RecommendationCard
             option={winner}
             targetSOC={effectiveTarget}
-            reasoning={reco?.reasoning}
-            warnings={
-              reco?.warnings && reco.warnings.length ? reco.warnings : warnings
-            }
+            noTarget={noTarget}
+            reasoning={noTarget ? noTargetReasoning : reco?.reasoning}
+            warnings={displayWarnings}
             onStart={startCharging}
             compact={wifeMode}
           />
@@ -555,7 +623,7 @@ export default function DecideTab() {
             </div>
           </Collapsible>
 
-          {kWhNeeded > 0 && winner && (
+          {(noTarget || kWhNeeded > 0) && winner && (
             <Collapsible
               title={tr("decide.compareOptions")}
               open={showCompare}
@@ -586,6 +654,7 @@ export default function DecideTab() {
                     key={o.id}
                     option={o}
                     targetSOC={effectiveTarget}
+                    noTarget={noTarget}
                     isWinner={o.id === winner.id}
                     showBreakdown={showBreakdown}
                     note={o.isNightOption ? tr("decide.nightNote") : undefined}

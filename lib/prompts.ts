@@ -13,12 +13,20 @@ export interface CurrentState {
   wifeMode?: boolean;
 }
 
-const DOMAIN_HEURISTICS = `Decision heuristics (already validated — follow them):
-- All nighttime PUBLIC charging is dominated by its daytime equivalent. Never recommend nighttime public charging except the NIO charger.
+const DOMAIN_HEURISTICS = `Decision heuristics (validated leanings, not hard rules — apply judgement):
+- Nighttime PUBLIC charging is usually dominated by its daytime equivalent, because daytime destination parking is typically free (sunk) while night charging wastes the already-paid home spot and means a night trip. Lean against it by default — but it can be the right call when the user's context below supports it (e.g. cheap night tariff, family parking on so home cost is zero, or waiting for daytime isn't practical). Weigh those real trade-offs rather than excluding it outright.
 - Daytime cost ordering, cheapest to most expensive: slow < medium < NIO < quick.
 - Match charger speed to dwell time; prefer the slower, cheaper option when there is enough time.
 - Zhuhai (~1.10 MOP/kWh) is only worthwhile when crossing the border anyway. Never make a dedicated trip just to charge.
 - Battery health: aim for 70-80% on daily charges; only go to 100% for long trips or LFP balancing.`;
+
+// The user's own living context, injected when present so the AI reasons with
+// their preferences instead of a hard-coded rule.
+function notesBlock(s: Settings): string {
+  const notes = (s.charging_notes ?? "").trim();
+  if (!notes) return "";
+  return `\nUser's living context (their own notes — weight these heavily, they override the default leanings above):\n${notes}\n`;
+}
 
 function setup(settings: Settings): string {
   return `The user drives a NIO ET5T with a ${settings.battery_capacity} kWh battery in Macau. Battery chemistry: ${settings.battery_chemistry}.`;
@@ -91,7 +99,7 @@ ${summarizeSessions(recentSessions, 10)}
 ${stateBlock(currentState)}
 
 ${DOMAIN_HEURISTICS}
-
+${notesBlock(settings)}
 Answer briefly and specifically. Always cite concrete MOP amounts and kWh when relevant. Do not hedge. Markdown is allowed but keep it tight. Never invent tariffs — use the values above.${wife}`;
 }
 
@@ -121,10 +129,10 @@ ${optionLines}
 ${summarizeSessions(recentSessions, 5)}
 
 ${DOMAIN_HEURISTICS}
-
+${notesBlock(settings)}
 Rules:
 - The winner_option_id MUST be one of the ids listed above.
-- Prefer the cheapest feasible option, but use the heuristics to break ties and to warn about battery health or dominated choices.
+- Prefer the cheapest feasible option, but use the heuristics and the user's context to break ties and to warn about battery health or dominated choices.
 - reasoning must be under 200 characters, specific, and cite the MOP amount.
 - warnings: note battery-health concerns (target >90% or =100%, very low SOC) or if a cheaper option was filtered out for time.
 - alternatives_worth_mentioning: other ids worth a glance.`;

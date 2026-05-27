@@ -51,22 +51,16 @@ export async function POST(req: Request) {
   const { feasible } = rankOptions(all, ctx.dwellHours);
   const pool = feasible.length > 0 ? feasible : all;
 
-  // Heuristic: nighttime public charging is always dominated and must never be
-  // the recommendation (only NIO is acceptable at night). Pick the winner from
-  // the non-night-public pool; night options stay visible for comparison only.
-  const recommendable = pool.filter((o) => o.isNightOption !== true);
-  const isNightPublic = (id: string) =>
-    !recommendable.some((o) => o.id === id) &&
-    all.some((o) => o.id === id && o.isNightOption === true);
-
-  // Deterministic fallback: cheapest recommendable option.
-  const cheapest = recommendable[0] ?? pool[0];
+  // No hard exclusions: the model weighs the soft night-public leaning and the
+  // user's editable charging_notes (both in the prompt) and decides for itself.
+  // Deterministic fallback: cheapest feasible option.
+  const cheapest = pool[0];
   const fallback: Recommendation = {
     winner: cheapest?.id ?? "nio",
     reasoning: cheapest
-      ? `${cheapest.name} at ${formatMOP(cheapest.total)} is the cheapest sensible option.`
+      ? `${cheapest.name} at ${formatMOP(cheapest.total)} is the cheapest option.`
       : "no options available",
-    alternatives: recommendable.slice(1, 3).map((o) => o.id),
+    alternatives: pool.slice(1, 3).map((o) => o.id),
     warnings: buildWarnings(currentSOC, targetSOC),
   };
 
@@ -124,11 +118,9 @@ export async function POST(req: Request) {
     };
 
     const validIds = new Set(all.map((o) => o.id));
-    // Reject a night-public pick even if the model chose one.
-    const winner =
-      validIds.has(args.winner_option_id) && !isNightPublic(args.winner_option_id)
-        ? args.winner_option_id
-        : fallback.winner;
+    const winner = validIds.has(args.winner_option_id)
+      ? args.winner_option_id
+      : fallback.winner;
 
     const result: Recommendation = {
       winner,

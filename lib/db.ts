@@ -12,7 +12,10 @@ function client(): NeonQueryFunction<false, false> {
   if (sql) return sql;
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
-  sql = neon(url);
+  // The Neon HTTP driver issues queries via fetch(), which Next.js caches by
+  // default — that made settings reads stale after an update until the
+  // serverless instance recycled. Force no-store so every query hits the DB.
+  sql = neon(url, { fetchOptions: { cache: "no-store" } });
   return sql;
 }
 

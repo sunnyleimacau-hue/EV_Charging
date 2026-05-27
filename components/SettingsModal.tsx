@@ -125,20 +125,26 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const headingCls = "mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[92vh] w-full max-w-app flex-col rounded-t-2xl bg-white dark:bg-gray-950 sm:rounded-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[92dvh] w-full max-w-app flex-col rounded-t-2xl bg-white dark:bg-gray-950 sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-800">
           <h2 className="font-semibold">{tr("settings.title")}</h2>
           <button
             onClick={onClose}
             aria-label={tr("common.close")}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600 active:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:active:bg-gray-700"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex-1 space-y-4 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <section className={sectionCls}>
             <p className={headingCls}>{tr("settings.tariffs")}</p>
             <NumberField label={tr("settings.nioTariff")} value={form.nio_tariff} onChange={(v) => field("nio_tariff", v)} />

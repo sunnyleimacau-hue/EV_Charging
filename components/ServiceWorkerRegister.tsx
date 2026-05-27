@@ -15,7 +15,20 @@ export default function ServiceWorkerRegister() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      // If a worker is already controlling this page, a new one taking over
+      // means we updated — reload once so the fresh assets/data are shown.
+      if (navigator.serviceWorker.controller) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+      }
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => reg.update())
+        .catch(() => {});
     }
     const handler = (e: Event) => {
       e.preventDefault();

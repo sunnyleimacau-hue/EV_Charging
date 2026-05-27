@@ -43,3 +43,23 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* On phones, iOS Safari zooms the page when focusing an input whose font is
+   below 16px. Force form controls to 16px on small screens to prevent that
+   jarring zoom (purely a mobile concern; desktop keeps the smaller text). */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Safe-area helpers for notched phones / home indicator (needs viewport-fit
+   cover, set in the layout viewport). */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}

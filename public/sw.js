@@ -1,7 +1,9 @@
-// Minimal service worker: caches the app shell and serves an offline fallback
-// for navigations. API requests always go to the network.
-const CACHE = "macau-ev-v2";
-const SHELL = ["/", "/login", "/manifest.json", "/icons/icon-192.png"];
+// Minimal service worker. The app shell is data-driven (SSR settings), so we
+// deliberately do NOT cache "/" — navigations are always network-first, with
+// the login page as the only offline fallback. This avoids serving a stale
+// shell with out-of-date data baked in.
+const CACHE = "macau-ev-v3";
+const SHELL = ["/login", "/manifest.json", "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -29,9 +31,8 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return; // never cache API calls
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/").then((r) => r ?? caches.match("/login"))),
-    );
+    // Always go to the network; fall back to the login shell only when offline.
+    event.respondWith(fetch(request).catch(() => caches.match("/login")));
     return;
   }
 

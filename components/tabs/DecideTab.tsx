@@ -73,10 +73,12 @@ function DwellPicker({
   value,
   onChange,
   hoursLabel,
+  anyLabel,
 }: {
-  value: number;
-  onChange: (v: number) => void;
+  value: number | "";
+  onChange: (v: number | "") => void;
   hoursLabel: string;
+  anyLabel: string;
 }) {
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -94,6 +96,17 @@ function DwellPicker({
           {h % 1 === 0 ? h : h.toFixed(1)}h
         </button>
       ))}
+      <button
+        type="button"
+        onClick={() => onChange("")}
+        className={`rounded-full px-3 py-1 text-sm ${
+          value === ""
+            ? "bg-green-600 text-white"
+            : "border border-gray-300 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+        }`}
+      >
+        {anyLabel}
+      </button>
       <input
         type="number"
         inputMode="decimal"
@@ -101,8 +114,9 @@ function DwellPicker({
         min={0.25}
         value={value}
         onChange={(e) => {
+          if (e.target.value === "") return onChange("");
           const n = parseFloat(e.target.value);
-          onChange(Number.isFinite(n) && n > 0 ? n : 0.25);
+          onChange(Number.isFinite(n) && n > 0 ? n : "");
         }}
         aria-label={hoursLabel}
         className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-right text-sm outline-none focus:border-green-500 dark:border-gray-700 dark:bg-gray-900"
@@ -147,7 +161,9 @@ export default function DecideTab() {
 
   const [currentSOC, setCurrentSOC] = useState(40);
   const [targetSOC, setTargetSOC] = useState(80);
-  const [dwell, setDwell] = useState(2);
+  // Dwell is the prominent primary input but can be cleared; blank means "time
+  // is not a constraint" (rank purely by cost, today's behavior).
+  const [dwell, setDwell] = useState<number | "">(2);
   const [night, setNight] = useState(isNightNow());
   const [familyParking, setFamilyParking] = useState(true);
   const [parkingSunk, setParkingSunk] = useState(true);
@@ -173,7 +189,10 @@ export default function DecideTab() {
   const customTariffMop =
     customCurrency === "RMB" ? customPrice * s.rmb_to_mop : customPrice;
 
-  const dwellHours = dwell > 0 ? dwell : 0.25;
+  const dwellSet = dwell !== "" && dwell > 0;
+  // When blank, use a very large window so nothing is time-constrained — every
+  // charger "reaches" target and ranking falls back to pure cost.
+  const dwellHours = dwellSet ? (dwell as number) : 1e6;
 
   const allOptions = useMemo(
     () =>
@@ -257,7 +276,7 @@ export default function DecideTab() {
               isNight: night,
               hasFamilyParking: familyParking,
               parkingIsSunk: parkingSunk,
-              dwellHours,
+              dwellHours: dwellSet ? dwellHours : undefined,
             },
             extras: {
               custom: customOn
@@ -327,7 +346,7 @@ export default function DecideTab() {
     isNight: night,
     hasFamilyParking: familyParking,
     parkingIsSunk: parkingSunk,
-    dwellHours,
+    dwellHours: dwellSet ? dwellHours : undefined,
     wifeMode,
   };
 
@@ -382,18 +401,23 @@ export default function DecideTab() {
           }}
         />
         <div className="mt-4">
+          <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+            {tr("decide.dwellPrimary")}
+          </p>
+          <DwellPicker
+            value={dwell}
+            onChange={setDwell}
+            hoursLabel={tr("decide.hours")}
+            anyLabel={tr("decide.dwellAny")}
+          />
+        </div>
+        <div className="mt-4">
           <SocSlider
             label={tr("decide.targetSOC")}
             value={targetSOC}
             min={currentSOC}
             onChange={setTargetSOC}
           />
-        </div>
-        <div className="mt-4">
-          <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">
-            {tr("decide.dwellPrimary")}
-          </p>
-          <DwellPicker value={dwell} onChange={setDwell} hoursLabel={tr("decide.hours")} />
         </div>
         <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
           {tr("decide.toAdd")}:{" "}
@@ -428,6 +452,12 @@ export default function DecideTab() {
           />
         </>
       ) : null}
+
+      {/* Standing verdict: Zhuhai is cheapest by far if you're crossing anyway.
+          Always present, low-emphasis — not a competing local option. */}
+      <p className="px-1 text-xs text-gray-500 dark:text-gray-400">
+        🇨🇳 {tr("decide.zhuhaiNote")} · ~{s.rmb_to_mop.toFixed(2)} MOP/kWh
+      </p>
 
       {/* Everything below is detailed-mode only, collapsed by default */}
       {!wifeMode && (
@@ -525,13 +555,6 @@ export default function DecideTab() {
             </div>
           </Collapsible>
 
-          {/* Standing verdict: Zhuhai is always cheapest if you're crossing anyway */}
-          <div className="rounded-2xl border border-gray-200 px-4 py-3 text-sm dark:border-gray-800">
-            <p className="text-gray-600 dark:text-gray-300">
-              🇨🇳 {tr("decide.zhuhaiNote")} · ~{s.rmb_to_mop.toFixed(2)} MOP/kWh
-            </p>
-          </div>
-
           {kWhNeeded > 0 && winner && (
             <Collapsible
               title={tr("decide.compareOptions")}
@@ -565,6 +588,7 @@ export default function DecideTab() {
                     targetSOC={effectiveTarget}
                     isWinner={o.id === winner.id}
                     showBreakdown={showBreakdown}
+                    note={o.isNightOption ? tr("decide.nightNote") : undefined}
                     onStart={startCharging}
                   />
                 ))}

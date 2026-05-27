@@ -20,15 +20,17 @@ create table settings (
   daily_kwh_estimate numeric default 2.5,
   wife_mode_default boolean default false,
   -- Free-text living context the AI reads when recommending / answering chat.
-  charging_notes text not null default '',
+  -- Seeded with the validated heuristics; the owner can edit it in settings.
+  charging_notes text not null default 'Daytime cost order, cheapest first: slow < medium < NIO < quick. Night public charging is usually dominated — prefer the NIO charger or wait for daytime, when destination parking is free. The real downside of night public is wasting the already-paid home spot plus the hassle of a night trip. Zhuhai is the cheapest by far — charge there only when crossing the border anyway. Battery health: 70-80% on daily charges, 100% only for long trips or LFP balancing.',
   updated_at timestamptz not null default now(),
   constraint single_row check (id = 1)
 );
 
 insert into settings (id) values (1) on conflict do nothing;
 
--- Migration for existing databases (run once; safe to re-run):
---   alter table settings add column if not exists charging_notes text not null default '';
+-- Migration for existing databases (run once). Adding the column with this
+-- default backfills the existing settings row with the seed text:
+--   alter table settings add column if not exists charging_notes text not null default 'Daytime cost order, cheapest first: slow < medium < NIO < quick. Night public charging is usually dominated — prefer the NIO charger or wait for daytime, when destination parking is free. The real downside of night public is wasting the already-paid home spot plus the hassle of a night trip. Zhuhai is the cheapest by far — charge there only when crossing the border anyway. Battery health: 70-80% on daily charges, 100% only for long trips or LFP balancing.';
 
 -- Sessions: every charging event
 create table sessions (

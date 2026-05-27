@@ -8,12 +8,14 @@ export default function OptionRow({
   targetSOC,
   isWinner,
   showBreakdown,
+  note,
   onStart,
 }: {
   option: DwellOption;
   targetSOC: number;
   isWinner?: boolean;
   showBreakdown?: boolean;
+  note?: string;
   onStart?: (o: DwellOption) => void;
 }) {
   const { tr } = useApp();
@@ -37,6 +39,11 @@ export default function OptionRow({
             {short && ` (${tr("decide.target")} ${targetSOC}%)`} ·{" "}
             {formatTime(option.time)} · {option.mopPerKwh.toFixed(2)} MOP/kWh
           </p>
+          {note && (
+            <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+              {note}
+            </p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold tabular-nums">

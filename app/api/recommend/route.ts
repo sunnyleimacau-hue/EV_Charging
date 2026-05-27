@@ -3,9 +3,9 @@ import { one, query } from "@/lib/db";
 import { getOpenAI, OPENAI_MODEL } from "@/lib/openai";
 import { buildRecommendSystemPrompt } from "@/lib/prompts";
 import {
-  computeOptions,
+  computeDwellOptions,
   kWhToAdd,
-  rankOptions,
+  rankDwellOptions,
   formatMOP,
   type ChargingContext,
   type ExtraOptions,
@@ -47,18 +47,26 @@ export async function POST(req: Request) {
   }
   const s = settings;
   const kWhNeeded = kWhToAdd(currentSOC, targetSOC, s.battery_capacity);
-  const all = computeOptions(s, kWhNeeded, currentSOC, ctx, body.extras);
-  const { feasible } = rankOptions(all, ctx.dwellHours);
-  const pool = feasible.length > 0 ? feasible : all;
+  // Blank dwell means "time isn't a constraint" — use a very large window so
+  // every charger reaches target and ranking falls back to pure cost.
+  const dwellHours =
+    ctx.dwellHours != null && ctx.dwellHours > 0 ? ctx.dwellHours : 1e6;
+  const all = computeDwellOptions(s, currentSOC, targetSOC, dwellHours, ctx, body.extras);
+  // Same ordering the Decide tab shows: target-reaching options first (cheapest
+  // first), then the ones that fall short by how close they get.
+  const { meets, short } = rankDwellOptions(all);
+  const pool = [...meets, ...short];
 
   // No hard exclusions: the model weighs the soft night-public leaning and the
   // user's editable charging_notes (both in the prompt) and decides for itself.
-  // Deterministic fallback: cheapest feasible option.
+  // Deterministic fallback: cheapest option that reaches target, else closest.
   const cheapest = pool[0];
   const fallback: Recommendation = {
     winner: cheapest?.id ?? "nio",
     reasoning: cheapest
-      ? `${cheapest.name} at ${formatMOP(cheapest.total)} is the cheapest option.`
+      ? cheapest.meetsTarget
+        ? `${cheapest.name} at ${formatMOP(cheapest.total)} reaches your target cheapest.`
+        : `${cheapest.name} gets closest — ~${Math.round(cheapest.endSOC)}% at ${formatMOP(cheapest.total)}.`
       : "no options available",
     alternatives: pool.slice(1, 3).map((o) => o.id),
     warnings: buildWarnings(currentSOC, targetSOC),
@@ -66,7 +74,7 @@ export async function POST(req: Request) {
 
   try {
     const openai = getOpenAI();
-    const system = buildRecommendSystemPrompt(s, pool, sessions);
+    const system = buildRecommendSystemPrompt(s, pool, sessions, targetSOC);
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       max_tokens: 400,
@@ -74,9 +82,14 @@ export async function POST(req: Request) {
         { role: "system", content: system },
         {
           role: "user",
-          content: `Pick the best option for charging from ${currentSOC}% to ${targetSOC}% (${kWhNeeded.toFixed(
-            1,
-          )} kWh).`,
+          content:
+            ctx.dwellHours != null && ctx.dwellHours > 0
+              ? `Pick the best option for charging from ${currentSOC}% to ${targetSOC}% (${kWhNeeded.toFixed(
+                  1,
+                )} kWh) with about ${ctx.dwellHours}h parked.`
+              : `Pick the best option for charging from ${currentSOC}% to ${targetSOC}% (${kWhNeeded.toFixed(
+                  1,
+                )} kWh); time is not a constraint.`,
         },
       ],
       tools: [

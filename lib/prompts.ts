@@ -1,5 +1,5 @@
 import type { Session, Settings } from "./types";
-import type { CalculatedOption } from "./calculations";
+import type { DwellOption } from "./calculations";
 import { formatMOP, formatTime } from "./calculations";
 
 export interface CurrentState {
@@ -105,23 +105,26 @@ Answer briefly and specifically. Always cite concrete MOP amounts and kWh when r
 
 export function buildRecommendSystemPrompt(
   settings: Settings,
-  computedOptions: CalculatedOption[],
+  computedOptions: DwellOption[],
   recentSessions: Session[],
+  targetSOC: number,
 ): string {
   const optionLines = computedOptions
-    .map(
-      (o) =>
-        `- id="${o.id}" ${o.name}: ${formatMOP(o.total)} total, ${formatTime(
-          o.time,
-        )}, ${o.mopPerKwh.toFixed(2)} MOP/kWh effective`,
-    )
+    .map((o) => {
+      const reach = o.meetsTarget
+        ? `reaches target ${targetSOC}%`
+        : `reaches only ${Math.round(o.endSOC)}% in the time parked (target ${targetSOC}%)`;
+      return `- id="${o.id}" ${o.name}: ${reach}, ${formatMOP(o.total)} total, ${formatTime(
+        o.time,
+      )}, ${o.mopPerKwh.toFixed(2)} MOP/kWh effective`;
+    })
     .join("\n");
 
   return `You are a charging assistant for one couple in Macau. ${setup(
     settings,
   )}
 
-These options were already computed deterministically (costs include energy, parking and home opportunity cost). Pick the best one and call the select_recommendation tool.
+These options were already computed deterministically for the time the car will be parked. Each line shows the SOC actually reached in that window and the cost of the energy delivered (energy + parking + home opportunity cost). Pick the best one and call the select_recommendation tool.
 
 Computed options:
 ${optionLines}
@@ -132,9 +135,9 @@ ${DOMAIN_HEURISTICS}
 ${notesBlock(settings)}
 Rules:
 - The winner_option_id MUST be one of the ids listed above.
-- Prefer the cheapest feasible option, but use the heuristics and the user's context to break ties and to warn about battery health or dominated choices.
+- Prefer the cheapest option that REACHES the target within the time parked. If none reach it, pick the best value and warn that it falls short (state the % it reaches). Use the heuristics and the user's context to break ties.
 - reasoning must be under 200 characters, specific, and cite the MOP amount.
-- warnings: note battery-health concerns (target >90% or =100%, very low SOC) or if a cheaper option was filtered out for time.
+- warnings: note battery-health concerns (target >90% or =100%, very low SOC) or if the pick won't reach the target in time.
 - alternatives_worth_mentioning: other ids worth a glance.`;
 }
 
